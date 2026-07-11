@@ -19,7 +19,7 @@ import {
 import { useWallet } from "use-wallet";
 
 import NextLink from "next/link";
-import DarkModeSwitch from "./DarkModeSwitch";
+// import DarkModeSwitch from "./DarkModeSwitch";
 import { ChevronDownIcon, HamburgerIcon } from "@chakra-ui/icons";
 import chainConfig, { isBlockchainConfigured } from "../lib/blockchainConfig";
 import {
@@ -179,11 +179,11 @@ export default function NavBar() {
                 Setup Needed
               </Badge>
             ) : null}
-            <DarkModeSwitch />
+            {/* <DarkModeSwitch /> */}
           </Stack>
 
           <Flex display={{ base: "flex", md: "none" }}>
-            <DarkModeSwitch />
+            {/* <DarkModeSwitch /> */}
             <Menu>
               <MenuButton
                 as={IconButton}
