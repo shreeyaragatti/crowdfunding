@@ -82,7 +82,7 @@ export default function Footer() {
         <Stack direction={"row"} spacing={6}>
           <NextLink href="/">Home</NextLink>
           
-          <Link href={"mailto:harshbadhai242@gmail.com"} isExternal>
+          <Link href={"mailto:shreeyaragatti24@gmail.com"} isExternal>
             Contact
           </Link>
         </Stack>
@@ -106,7 +106,10 @@ export default function Footer() {
           <Stack direction={"row"} spacing={6}>
             
             
-            <SocialButton label={"Github"} href={"https://github.com/harsh242"}>
+            <SocialButton
+              label={"Github"}
+              href={"https://github.com/shreeyaragatti/crowdfunding"}
+            >
               <FaGithub />
             </SocialButton>
              

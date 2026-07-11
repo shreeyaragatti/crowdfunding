@@ -22,7 +22,12 @@ import NextLink from "next/link";
 import DarkModeSwitch from "./DarkModeSwitch";
 import { ChevronDownIcon, HamburgerIcon } from "@chakra-ui/icons";
 import chainConfig, { isBlockchainConfigured } from "../lib/blockchainConfig";
-import { shortAddress, switchToConfiguredNetwork } from "../lib/wallet";
+import {
+  connectInjectedWallet,
+  disconnectWallet,
+  shortAddress,
+  switchToConfiguredNetwork,
+} from "../lib/wallet";
 
 export default function NavBar() {
   const wallet = useWallet();
@@ -41,6 +46,20 @@ export default function NavBar() {
         description: error.message,
         status: "error",
         duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleConnectWallet = async () => {
+    try {
+      await connectInjectedWallet(wallet);
+    } catch (error) {
+      toast({
+        title: "Wallet connection failed",
+        description: error.message,
+        status: "error",
+        duration: 6000,
         isClosable: true,
       });
     }
@@ -130,7 +149,7 @@ export default function NavBar() {
                       Switch to {chainConfig.chainName}
                     </MenuItem>
                   ) : null}
-                  <MenuItem onClick={() => wallet.reset()}>
+                  <MenuItem onClick={() => disconnectWallet(wallet)}>
                     {" "}
                     Disconnect Wallet{" "}
                   </MenuItem>
@@ -148,7 +167,7 @@ export default function NavBar() {
                   _hover={{
                     bg: "teal.300",
                   }}
-                  onClick={() => wallet.connect()}
+                  onClick={handleConnectWallet}
                 >
                   Connect Wallet{" "}
                 </Button>
@@ -187,12 +206,12 @@ export default function NavBar() {
                         Switch to {chainConfig.chainName}
                       </MenuItem>
                     ) : null}
-                    <MenuItem onClick={() => wallet.reset()}>
+                    <MenuItem onClick={() => disconnectWallet(wallet)}>
                       Disconnect Wallet
                     </MenuItem>
                   </>
                 ) : (
-                  <MenuItem onClick={() => wallet.connect()}>
+                  <MenuItem onClick={handleConnectWallet}>
                     Connect Wallet
                   </MenuItem>
                 )}

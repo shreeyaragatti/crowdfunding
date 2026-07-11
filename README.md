@@ -1,6 +1,8 @@
 BetterFund : Crowdfunding Platform Powered by Ethereum Blockchain
 
-The Platform is live on Rinkeby Test Network and available to use at : [betterfund.vercel.app](https://betterfund.vercel.app/)
+Repository: [shreeyaragatti/crowdfunding](https://github.com/shreeyaragatti/crowdfunding)
+
+Contact: [shreeyaragatti24@gmail.com](mailto:shreeyaragatti24@gmail.com)
 
 ## Problem Statement and Necessity 
 Crowdfunding is one of the most popular ways to raise funds for any project, cause or for helping any individual in need. With the onset of Covid we have seen a rise in Crowdfunding activities across the globe which includes small campaigns to help people get oxygen and medical help to large funds such as PM Cares.
@@ -36,31 +38,65 @@ We were highly inspired by the CryptoRelief initiative ([www.cryptorelief.in](ht
 - Solidity
 - Web3.js
 
-## To run the application locally
-- Fork the Project 
-- run `yarn install` to install all the dependencies
-- run `yarn dev` to run the application locally
+## Local setup
+1. Install dependencies:
+   `npm install`
+2. Copy the environment template:
+   `copy .env.example .env`
+3. Fill these required values in `.env`:
+   - `NEXT_PUBLIC_RPC_URL`: Sepolia RPC URL from Alchemy, Infura, QuickNode, etc.
+   - `DEPLOYER_PRIVATE_KEY`: private key for the wallet that will deploy contracts.
+   - `NEXT_PUBLIC_BACKEND_PROVIDER`: use `prisma` for server-side Supabase Postgres.
+   - `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL, only needed for browser-side Supabase APIs.
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon/public key, only needed for browser-side Supabase APIs.
+   - `SUPABASE_SERVICE_ROLE_KEY`: server-only Supabase key used by API routes for campaign image uploads and metadata writes.
+   - `NEXT_PUBLIC_CAMPAIGN_IMAGE_BUCKET`: Supabase Storage bucket for uploaded campaign images. Defaults to `campaign-images`.
+   - `DATABASE_URL`: Supabase transaction-mode pooler URL for Prisma runtime queries.
+   - `DIRECT_URL`: Supabase session-mode pooler URL for Prisma schema sync and migrations.
+4. Sync the Prisma schema to Supabase:
+   `npm run db:push`
+5. Compile and deploy the contracts:
+   `npm run contracts:compile`
+   `npm run contracts:deploy:sepolia`
+6. Start the app:
+   `npm run dev`
 
-## Prerequisites to create Campaign and Contribute
-1. Install **Metamask** as Google Chrome Extension and Create an account.
-2.  Request Ether by sharing your ethereum address in social media <br>(`https://faucet.rinkeby.io/)`
-3. Get 0.01 ether free by giving the ethereum address <br>`(http://rinkeby-faucet.com/)`
+The deploy script automatically writes `NEXT_PUBLIC_FACTORY_ADDRESS` back into `.env` or `.env.local` after the `CampaignFactory` contract is deployed.
 
-## To Deploy your own Contract 
-1. Create an account in [https://infura.io](https://infura.io/)
-2. Create .env file in Ethereum directory and add these line to it.
-	> mnemonic = 'Your mnemonic code' <br>
-	link = 'Your infura end point link '
-3. Do the Changes that you want to do inside the Solidity File
-4. Compile the Contract 
-  `node compile.js`
-5. Deploy Contract by going into smart-contract Directory and run.
-	`node deploy.js`
-	
-   Copy the contract deploy address and replace it in factory.js file.
-  
-  
-6. Replace your "infura end point link" in web3.js file
+## Environment values
+- `NEXT_PUBLIC_CHAIN_ID`: default `11155111` for Sepolia.
+- `NEXT_PUBLIC_CHAIN_NAME`: default `Sepolia`.
+- `NEXT_PUBLIC_RPC_URL`: frontend and server-side blockchain RPC.
+- `SEPOLIA_RPC_URL`: optional Hardhat-only RPC; leave blank to reuse `NEXT_PUBLIC_RPC_URL`.
+- `NEXT_PUBLIC_BLOCK_EXPLORER_URL`: default `https://sepolia.etherscan.io`.
+- `NEXT_PUBLIC_FACTORY_ADDRESS`: deployed `CampaignFactory` contract address.
+- `NEXT_PUBLIC_OWNER_ADDRESS`: optional project owner/admin wallet address.
+- `NEXT_PUBLIC_BACKEND_PROVIDER`: default `supabase`.
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon/public key.
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only key for API routes. Never prefix this with `NEXT_PUBLIC`.
+- `NEXT_PUBLIC_CAMPAIGN_IMAGE_BUCKET`: public bucket name for uploaded campaign images.
+- `DATABASE_URL`: Prisma runtime URL. Use the Supabase transaction-mode pooler on port `6543`.
+- `DIRECT_URL`: Prisma migration/schema URL. Use the Supabase session-mode pooler on port `5432`.
+- `DEPLOYER_PRIVATE_KEY`: deployer wallet private key. Never prefix this with `NEXT_PUBLIC`.
+
+## Prisma
+- `npm run db:generate`: generate Prisma Client.
+- `npm run db:push`: sync `prisma/schema.prisma` to Supabase.
+- `npm run db:migrate`: create and apply a Prisma migration.
+- `npm run db:studio`: open Prisma Studio.
+
+The reusable Prisma client lives at `lib/prisma.js`. Runtime queries use `DATABASE_URL`; Prisma CLI commands use `DIRECT_URL` through `prisma.config.ts`.
+
+## Campaign images
+Campaign creation accepts either a local image upload or an existing image URL. Local images are uploaded by `pages/api/campaign-image.js` to Supabase Storage, then the resulting public URL is written to the campaign contract.
+
+Set `SUPABASE_SERVICE_ROLE_KEY` before using local uploads. The route creates the configured bucket as public if it does not already exist.
+
+## Prerequisites to create campaigns and contribute
+1. Install MetaMask and create/import a wallet.
+2. Switch MetaMask to Sepolia.
+3. Fund the wallet with Sepolia test ETH from a faucet.
 
 
 ## Deploy on Vercel

@@ -3,6 +3,7 @@ import { ChakraProvider, extendTheme } from "@chakra-ui/react";
 import { UseWalletProvider } from "use-wallet";
 import NavBar from "../components/Navbar";
 import Footer from "../components/Footer";
+import WalletAutoConnect from "../components/WalletAutoConnect";
 import "@fontsource/space-grotesk";
 import chainConfig from "../lib/blockchainConfig";
 
@@ -26,6 +27,7 @@ function MyApp({ Component, pageProps }) {
             },
           }}
         >
+          <WalletAutoConnect />
           <NavBar />
           <Component {...pageProps} />
           <Footer />{" "}

@@ -22,6 +22,8 @@ import {
   AlertDescription,
   FormHelperText,
   Textarea,
+  useToast,
+  Image,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
 import { ArrowBackIcon } from "@chakra-ui/icons";
@@ -30,6 +32,7 @@ import { getETHPrice, getETHPriceInUSD } from "../../lib/getETHPrice";
 import factory from "../../smart-contract/factory";
 import web3 from "../../smart-contract/web3";
 import { isBlockchainConfigured } from "../../lib/blockchainConfig";
+import { connectInjectedWallet } from "../../lib/wallet";
 
 export default function NewCampaign() {
   const {
@@ -39,12 +42,16 @@ export default function NewCampaign() {
   } = useForm({
     mode: "onChange",
   });
+  const imageFileField = register("imageFile");
   const router = useRouter();
   const [error, setError] = useState("");
   const wallet = useWallet();
+  const toast = useToast();
   const [minContriInUSD, setMinContriInUSD] = useState();
   const [targetInUSD, setTargetInUSD] = useState();
   const [ETHPrice, setETHPrice] = useState(0);
+  const [imagePreview, setImagePreview] = useState("");
+  const [selectedImageName, setSelectedImageName] = useState("");
   useAsync(async () => {
     try {
       const result = await getETHPrice();
@@ -53,33 +60,88 @@ export default function NewCampaign() {
       console.log(error);
     }
   }, []);
+  const uploadCampaignImage = async (file, creator) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    formData.append("creator", creator);
+
+    const response = await fetch("/api/campaign-image", {
+      method: "POST",
+      body: formData,
+    });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Campaign image upload failed.");
+    }
+
+    return result.publicUrl;
+  };
+
   async function onSubmit(data) {
     console.log(
       data.minimumContribution,
       data.campaignName,
       data.description,
-      data.imageUrl,
       data.target
     );
     try {
       if (!isBlockchainConfigured || !factory) {
         throw new Error(
-          "Blockchain settings are not complete. Add RPC and factory contract values to .env.local."
+          "Blockchain settings are not complete. Add RPC and factory contract values to .env or .env.local."
         );
       }
 
       const accounts = await web3.eth.getAccounts();
-      await factory.methods
+      const imageFile = data.imageFile && data.imageFile[0];
+      const imageUrl = imageFile
+        ? await uploadCampaignImage(imageFile, accounts[0])
+        : data.imageUrl;
+
+      if (!imageUrl) {
+        throw new Error("Upload a campaign image or paste an image URL.");
+      }
+
+      const minimumContributionWei = web3.utils.toWei(
+        data.minimumContribution,
+        "ether"
+      );
+      const targetWei = web3.utils.toWei(data.target, "ether");
+
+      const receipt = await factory.methods
         .createCampaign(
-          web3.utils.toWei(data.minimumContribution, "ether"),
+          minimumContributionWei,
           data.campaignName,
           data.description,
-          data.imageUrl,
-          web3.utils.toWei(data.target, "ether")
+          imageUrl,
+          targetWei
         )
         .send({
           from: accounts[0],
         });
+
+      const contractAddress =
+        receipt.events &&
+        receipt.events.CampaignCreated &&
+        receipt.events.CampaignCreated.returnValues &&
+        receipt.events.CampaignCreated.returnValues.campaign;
+
+      await fetch("/api/campaign-metadata", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contractAddress,
+          creatorAddress: accounts[0],
+          name: data.campaignName,
+          description: data.description,
+          imageUrl,
+          minimumContributionWei,
+          targetWei,
+          transactionHash: receipt.transactionHash,
+        }),
+      });
 
       router.push("/");
     } catch (err) {
@@ -87,6 +149,20 @@ export default function NewCampaign() {
       console.log(err);
     }
   }
+
+  const handleConnectWallet = async () => {
+    try {
+      await connectInjectedWallet(wallet);
+    } catch (error) {
+      toast({
+        title: "Wallet connection failed",
+        description: error.message,
+        status: "error",
+        duration: 6000,
+        isClosable: true,
+      });
+    }
+  };
 
   return (
     <div>
@@ -148,11 +224,43 @@ export default function NewCampaign() {
                   />
                 </FormControl>
                 <FormControl id="imageUrl">
-                  <FormLabel>Image URL</FormLabel>
+                  <FormLabel>Campaign Image</FormLabel>
                   <Input
-                    {...register("imageUrl", { required: true })}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    name={imageFileField.name}
+                    ref={imageFileField.ref}
+                    onBlur={imageFileField.onBlur}
+                    isDisabled={isSubmitting}
+                    pt={1}
+                    onChange={(event) => {
+                      imageFileField.onChange(event);
+                      const file = event.target.files && event.target.files[0];
+                      setSelectedImageName(file ? file.name : "");
+                      setImagePreview(file ? URL.createObjectURL(file) : "");
+                    }}
+                  />
+                  {selectedImageName ? (
+                    <FormHelperText>{selectedImageName}</FormHelperText>
+                  ) : null}
+                  {imagePreview ? (
+                    <Image
+                      src={imagePreview}
+                      alt="Selected campaign image preview"
+                      mt={3}
+                      rounded="md"
+                      maxH="220px"
+                      objectFit="cover"
+                    />
+                  ) : null}
+                  <FormHelperText>
+                    Or paste an image URL if the image is already hosted.
+                  </FormHelperText>
+                  <Input
+                    {...register("imageUrl")}
                     isDisabled={isSubmitting}
                     type="url"
+                    mt={2}
                   />
                 </FormControl>
                 <FormControl id="target">
@@ -183,15 +291,14 @@ export default function NewCampaign() {
                   </Alert>
                 ) : null}
                 {errors.minimumContribution ||
-                errors.name ||
+                errors.campaignName ||
                 errors.description ||
-                errors.imageUrl ||
                 errors.target ? (
                   <Alert status="error">
                     <AlertIcon />
                     <AlertDescription mr={2}>
-                      {" "}
-                      All Fields are Required
+                      Campaign name, description, minimum contribution, and
+                      target are required
                     </AlertDescription>
                   </Alert>
                 ) : null}
@@ -211,12 +318,13 @@ export default function NewCampaign() {
                   ) : (
                     <Stack spacing={3}>
                       <Button
+                        type="button"
                         color={"white"}
                         bg={"teal.400"}
                         _hover={{
                           bg: "teal.300",
                         }}
-                        onClick={() => wallet.connect()}
+                        onClick={handleConnectWallet}
                       >
                         Connect Wallet{" "}
                       </Button>

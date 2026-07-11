@@ -2,12 +2,20 @@ const fs = require("fs");
 const path = require("path");
 const { ethers } = require("hardhat");
 
+function getEnvPath() {
+  const envPath = path.join(process.cwd(), ".env");
+  const localEnvPath = path.join(process.cwd(), ".env.local");
+
+  if (fs.existsSync(localEnvPath)) return localEnvPath;
+  return envPath;
+}
+
 async function main() {
   const [deployer] = await ethers.getSigners();
 
   if (!deployer) {
     throw new Error(
-      "No deployer account configured. Set DEPLOYER_PRIVATE_KEY in .env.local."
+      "No deployer account configured. Set DEPLOYER_PRIVATE_KEY in .env or .env.local."
     );
   }
 
@@ -20,7 +28,7 @@ async function main() {
 
   console.log(`CampaignFactory deployed: ${factory.address}`);
 
-  const envPath = path.join(process.cwd(), ".env.local");
+  const envPath = getEnvPath();
   const currentEnv = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
 
   const nextEnv = currentEnv.match(/^NEXT_PUBLIC_FACTORY_ADDRESS=/m)
@@ -59,7 +67,7 @@ async function main() {
     );
   }
 
-  console.log(".env.local updated with NEXT_PUBLIC_FACTORY_ADDRESS");
+  console.log(`${path.basename(envPath)} updated with NEXT_PUBLIC_FACTORY_ADDRESS`);
   console.log("Frontend ABI files refreshed in smart-contract/build");
 }
 

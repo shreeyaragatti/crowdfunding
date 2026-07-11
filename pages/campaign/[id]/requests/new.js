@@ -24,10 +24,12 @@ import {
   FormErrorMessage,
   FormHelperText,
   Textarea,
+  useToast,
 } from "@chakra-ui/react";
 import web3 from "../../../../smart-contract/web3";
 import Campaign from "../../../../smart-contract/campaign";
 import { useAsync } from "react-use";
+import { connectInjectedWallet } from "../../../../lib/wallet";
 
 export default function NewRequest() {
   const router = useRouter();
@@ -43,6 +45,7 @@ export default function NewRequest() {
   const [inUSD, setInUSD] = useState();
   const [ETHPrice, setETHPrice] = useState(0);
   const wallet = useWallet();
+  const toast = useToast();
   useAsync(async () => {
     try {
       const result = await getETHPrice();
@@ -70,6 +73,20 @@ export default function NewRequest() {
       console.log(err);
     }
   }
+
+  const handleConnectWallet = async () => {
+    try {
+      await connectInjectedWallet(wallet);
+    } catch (error) {
+      toast({
+        title: "Wallet connection failed",
+        description: error.message,
+        status: "error",
+        duration: 6000,
+        isClosable: true,
+      });
+    }
+  };
 
   return (
     <div>
@@ -169,12 +186,13 @@ export default function NewRequest() {
                   ) : (
                     <Stack spacing={3}>
                       <Button
+                        type="button"
                         color={"white"}
                         bg={"teal.400"}
                         _hover={{
                           bg: "teal.300",
                         }}
-                        onClick={() => wallet.connect()}
+                        onClick={handleConnectWallet}
                       >
                         Connect Wallet{" "}
                       </Button>

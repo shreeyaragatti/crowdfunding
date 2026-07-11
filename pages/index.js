@@ -54,7 +54,7 @@ export async function getServerSideProps(context) {
       props: {
         campaigns: [],
         loadError:
-          "Blockchain settings are not complete yet. Add RPC and factory contract values to .env.local after deployment.",
+          "Blockchain settings are not complete yet. Add RPC and factory contract values to .env or .env.local after deployment.",
       },
     };
   }
@@ -383,7 +383,7 @@ export default function Home({ campaigns, loadError }) {
             For any queries raise an issue on{" "}
             <Link
               color="teal.500"
-              href="https://github.com/harsh242/betterfund-crowdfunding-in-blockchain/issues"
+              href="https://github.com/shreeyaragatti/crowdfunding/issues"
               isExternal
             >
               the Github Repo <ExternalLinkIcon mx="2px" />
