@@ -37,35 +37,57 @@ import {
   Link,
 } from "@chakra-ui/react";
 
-import { InfoIcon, ExternalLinkIcon } from "@chakra-ui/icons";
+import { InfoIcon, ExternalLinkIcon, ArrowBackIcon } from "@chakra-ui/icons";
 import NextLink from "next/link";
 import Confetti from "react-confetti";
 
 import web3 from "../../smart-contract/web3";
 import Campaign from "../../smart-contract/campaign";
 import factory from "../../smart-contract/factory";
+import { getAddressExplorerUrl } from "../../lib/blockchainConfig";
 
 export async function getServerSideProps({ params }) {
   const campaignId = params.id;
-  const campaign = Campaign(campaignId);
-  const summary = await campaign.methods.getSummary().call();
-  const ETHPrice = await getETHPrice();
+  try {
+    const campaign = Campaign(campaignId);
+    const summary = await campaign.methods.getSummary().call();
+    const ETHPrice = await getETHPrice();
 
-  return {
-    props: {
-      id: campaignId,
-      minimumContribution: summary[0],
-      balance: summary[1],
-      requestsCount: summary[2],
-      approversCount: summary[3],
-      manager: summary[4],
-      name: summary[5],
-      description: summary[6],
-      image: summary[7],
-      target: summary[8],
-      ETHPrice,
-    },
-  };
+    return {
+      props: {
+        id: campaignId,
+        minimumContribution: summary[0],
+        balance: summary[1],
+        requestsCount: summary[2],
+        approversCount: summary[3],
+        manager: summary[4],
+        name: summary[5],
+        description: summary[6],
+        image: summary[7],
+        target: summary[8],
+        ETHPrice,
+        loadError: "",
+      },
+    };
+  } catch (error) {
+    return {
+      props: {
+        id: campaignId,
+        minimumContribution: "0",
+        balance: "0",
+        requestsCount: "0",
+        approversCount: "0",
+        manager: "",
+        name: "Campaign unavailable",
+        description: "",
+        image: "",
+        target: "0",
+        ETHPrice: 0,
+        loadError:
+          "This campaign could not be loaded from the configured Ethereum network.",
+      },
+    };
+  }
 }
 
 function StatsCard(props) {
@@ -122,6 +144,7 @@ export default function CampaignSingle({
   image,
   target,
   ETHPrice,
+  loadError,
 }) {
   const { handleSubmit, register, formState, reset, getValues } = useForm({
     mode: "onChange",
@@ -163,8 +186,19 @@ export default function CampaignSingle({
       </Head>
       {isSubmitted ? <Confetti width={width} height={height} /> : null}
       <main>
-        {" "}
-        <Box position={"relative"}>
+        {loadError ? (
+          <Container maxW={"3xl"} py={{ base: 8 }}>
+            <Text fontSize={"lg"} color={"teal.400"} mb={4}>
+              <ArrowBackIcon mr={2} />
+              <NextLink href="/">Back to Home</NextLink>
+            </Text>
+            <Alert status="warning" rounded="md">
+              <AlertIcon />
+              <AlertDescription>{loadError}</AlertDescription>
+            </Alert>
+          </Container>
+        ) : (
+          <Box position={"relative"}>
           {isSubmitted ? (
             <Container
               maxW={"7xl"}
@@ -209,10 +243,10 @@ export default function CampaignSingle({
               </Text>
               <Link
                 color="teal.500"
-                href={`https://rinkeby.etherscan.io/address/${id}`}
+                href={getAddressExplorerUrl(id)}
                 isExternal
               >
-                View on Rinkeby Etherscan <ExternalLinkIcon mx="2px" />
+                View on Block Explorer <ExternalLinkIcon mx="2px" />
               </Link>
               <Box mx={"auto"} w={"full"}>
                 <SimpleGrid columns={{ base: 1 }} spacing={{ base: 5 }}>
@@ -436,6 +470,7 @@ export default function CampaignSingle({
             </Stack>
           </Container>
         </Box>
+        )}
       </main>
     </div>
   );

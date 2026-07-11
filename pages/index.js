@@ -24,6 +24,9 @@ import {
   HStack,
   Stack,
   Progress,
+  Alert,
+  AlertIcon,
+  AlertDescription,
 } from "@chakra-ui/react";
 
 import factory from "../smart-contract/factory";
@@ -32,15 +35,29 @@ import Campaign from "../smart-contract/campaign";
 import { ExternalLinkIcon } from "@chakra-ui/icons";
 import { FaHandshake } from "react-icons/fa";
 import { FcShare, FcDonate, FcMoneyTransfer } from "react-icons/fc";
+import { isBlockchainConfigured } from "../lib/blockchainConfig";
+import ProjectSetupStatus from "../components/ProjectSetupStatus";
 
 export async function getServerSideProps(context) {
-  const campaigns = await factory.methods.getDeployedCampaigns().call();
+  try {
+    if (!isBlockchainConfigured || !factory) {
+      throw new Error("Blockchain environment is not configured.");
+    }
 
-  console.log(campaigns);
+    const campaigns = await factory.methods.getDeployedCampaigns().call();
 
-  return {
-    props: { campaigns },
-  };
+    return {
+      props: { campaigns, loadError: "" },
+    };
+  } catch (error) {
+    return {
+      props: {
+        campaigns: [],
+        loadError:
+          "Blockchain settings are not complete yet. Add RPC and factory contract values to .env.local after deployment.",
+      },
+    };
+  }
 }
 
 const Feature = ({ title, text, icon }) => {
@@ -95,6 +112,7 @@ function CampaignCard({
           <Img
             src={imageURL}
             alt={`Picture of ${name}`}
+            fallbackSrc="/static/no-requests.png"
             roundedTop="lg"
             objectFit="cover"
             w="full"
@@ -198,12 +216,15 @@ function CampaignCard({
   );
 }
 
-export default function Home({ campaigns }) {
+export default function Home({ campaigns, loadError }) {
   const [campaignList, setCampaignList] = useState([]);
+  const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(true);
+  const [campaignError, setCampaignError] = useState(loadError || "");
   const [ethPrice, updateEthPrice] = useState(null);
 
   async function getSummary() {
     try {
+      setCampaignError("");
       const summary = await Promise.all(
         campaigns.map((campaign, i) =>
           Campaign(campaigns[i]).methods.getSummary().call()
@@ -217,11 +238,18 @@ export default function Home({ campaigns }) {
       return summary;
     } catch (e) {
       console.log(e);
+      setCampaignError("Campaign details could not be loaded right now.");
+    } finally {
+      setIsLoadingCampaigns(false);
     }
   }
 
   useEffect(() => {
-    getSummary();
+    if (campaigns.length > 0) {
+      getSummary();
+    } else {
+      setIsLoadingCampaigns(false);
+    }
   }, []);
 
   return (
@@ -236,6 +264,7 @@ export default function Home({ campaigns }) {
       </Head>
       <main className={styles.main}>
         <Container py={{ base: "4", md: "12" }} maxW={"7xl"} align={"left"}>
+          <ProjectSetupStatus />
           {" "}
           <Heading
             textAlign={useBreakpointValue({ base: "left" })}
@@ -271,7 +300,20 @@ export default function Home({ campaigns }) {
 
           <Divider marginTop="4" />
 
-          {campaignList.length > 0 ? (
+          {campaignError ? (
+            <Alert status="warning" mt={6} rounded="md">
+              <AlertIcon />
+              <AlertDescription>{campaignError}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {isLoadingCampaigns ? (
+            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10} py={8}>
+              <Skeleton height="25rem" />
+              <Skeleton height="25rem" />
+              <Skeleton height="25rem" />
+            </SimpleGrid>
+          ) : campaignList.length > 0 ? (
             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10} py={8}>
               {campaignList.map((el, i) => {
                 return (
@@ -291,11 +333,19 @@ export default function Home({ campaigns }) {
               })}
             </SimpleGrid>
           ) : (
-            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10} py={8}>
-              <Skeleton height="25rem" />
-              <Skeleton height="25rem" />
-              <Skeleton height="25rem" />
-            </SimpleGrid>
+            <Box
+              py={12}
+              textAlign="center"
+              color={useColorModeValue("gray.600", "gray.300")}
+            >
+              <Heading as="h3" size="md" mb={2}>
+                No campaigns found
+              </Heading>
+              <Text>
+                Create the first campaign or connect to the network where your
+                contracts are deployed.
+              </Text>
+            </Box>
           )}
         </Container>
         <Container py={{ base: "4", md: "12" }} maxW={"7xl"} id="howitworks">

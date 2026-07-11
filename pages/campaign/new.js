@@ -29,6 +29,7 @@ import { getETHPrice, getETHPriceInUSD } from "../../lib/getETHPrice";
 
 import factory from "../../smart-contract/factory";
 import web3 from "../../smart-contract/web3";
+import { isBlockchainConfigured } from "../../lib/blockchainConfig";
 
 export default function NewCampaign() {
   const {
@@ -61,6 +62,12 @@ export default function NewCampaign() {
       data.target
     );
     try {
+      if (!isBlockchainConfigured || !factory) {
+        throw new Error(
+          "Blockchain settings are not complete. Add RPC and factory contract values to .env.local."
+        );
+      }
+
       const accounts = await web3.eth.getAccounts();
       await factory.methods
         .createCampaign(

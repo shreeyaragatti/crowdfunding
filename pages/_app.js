@@ -4,6 +4,7 @@ import { UseWalletProvider } from "use-wallet";
 import NavBar from "../components/Navbar";
 import Footer from "../components/Footer";
 import "@fontsource/space-grotesk";
+import chainConfig from "../lib/blockchainConfig";
 
 const theme = extendTheme({
   fonts: {
@@ -18,11 +19,10 @@ function MyApp({ Component, pageProps }) {
       {" "}
       <ChakraProvider theme={theme}>
         <UseWalletProvider
-          chainId={4}
+          chainId={chainConfig.chainId}
           connectors={{
             walletconnect: {
-              rpcUrl:
-                "https://rinkeby.infura.io/v3/08ac79d88b5d4aea961ca36af7ea6ee7",
+              rpcUrl: chainConfig.rpcUrl,
             },
           }}
         >

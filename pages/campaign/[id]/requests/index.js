@@ -40,25 +40,42 @@ import {
 import web3 from "../../../../smart-contract/web3";
 import Campaign from "../../../../smart-contract/campaign";
 import factory from "../../../../smart-contract/factory";
+import { getAddressExplorerUrl } from "../../../../lib/blockchainConfig";
 
 export async function getServerSideProps({ params }) {
   const campaignId = params.id;
-  const campaign = Campaign(campaignId);
-  const requestCount = await campaign.methods.getRequestsCount().call();
-  const approversCount = await campaign.methods.approversCount().call();
-  const summary = await campaign.methods.getSummary().call();
-  const ETHPrice = await getETHPrice();
+  try {
+    const campaign = Campaign(campaignId);
+    const requestCount = await campaign.methods.getRequestsCount().call();
+    const approversCount = await campaign.methods.approversCount().call();
+    const summary = await campaign.methods.getSummary().call();
+    const ETHPrice = await getETHPrice();
 
-  return {
-    props: {
-      campaignId,
-      requestCount,
-      approversCount,
-      balance: summary[1],
-      name: summary[5],
-      ETHPrice,
-    },
-  };
+    return {
+      props: {
+        campaignId,
+        requestCount,
+        approversCount,
+        balance: summary[1],
+        name: summary[5],
+        ETHPrice,
+        loadError: "",
+      },
+    };
+  } catch (error) {
+    return {
+      props: {
+        campaignId,
+        requestCount: "0",
+        approversCount: "0",
+        balance: "0",
+        name: "Campaign unavailable",
+        ETHPrice: 0,
+        loadError:
+          "Withdrawal requests could not be loaded from the configured Ethereum network.",
+      },
+    };
+  }
 }
 
 const RequestRow = ({
@@ -125,7 +142,7 @@ const RequestRow = ({
       <Td>
         <Link
           color="teal.500"
-          href={`https://rinkeby.etherscan.io/address/${request.recipient}`}
+          href={getAddressExplorerUrl(request.recipient)}
           isExternal
         >
           {" "}
@@ -249,6 +266,7 @@ export default function Requests({
   balance,
   name,
   ETHPrice,
+  loadError,
 }) {
   const [requestsList, setRequestsList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -270,6 +288,7 @@ export default function Requests({
       return requests;
     } catch (e) {
       console.log(e);
+      setIsLoading(false);
     }
   }
 
@@ -336,8 +355,14 @@ export default function Requests({
               </AlertDescription>
             </Alert>
           ) : null}
+          {loadError ? (
+            <Alert status="warning" my={4} rounded="md">
+              <AlertIcon />
+              <AlertDescription>{loadError}</AlertDescription>
+            </Alert>
+          ) : null}
         </Container>
-        {requestsList.length > 0 ? (
+        {!loadError && requestsList.length > 0 ? (
           <Container px={{ base: "4", md: "12" }} maxW={"7xl"} align={"left"}>
             <Flex flexDirection={{ base: "column", lg: "row" }} py={4}>
               <Box py="2" pr="2">
@@ -408,7 +433,7 @@ export default function Requests({
               </Table>
             </Box>
           </Container>
-        ) : (
+        ) : !loadError ? (
           <div>
             <Container
               px={{ base: "4", md: "12" }}
@@ -486,7 +511,7 @@ export default function Requests({
               </SimpleGrid>
             </Container>
           </div>
-        )}
+        ) : null}
       </main>
     </div>
   );

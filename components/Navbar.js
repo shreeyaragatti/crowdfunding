@@ -13,15 +13,42 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
+  Badge,
+  useToast,
 } from "@chakra-ui/react";
 import { useWallet } from "use-wallet";
 
 import NextLink from "next/link";
 import DarkModeSwitch from "./DarkModeSwitch";
-import { ChevronDownIcon } from "@chakra-ui/icons";
+import { ChevronDownIcon, HamburgerIcon } from "@chakra-ui/icons";
+import chainConfig, { isBlockchainConfigured } from "../lib/blockchainConfig";
+import { shortAddress, switchToConfiguredNetwork } from "../lib/wallet";
 
 export default function NavBar() {
   const wallet = useWallet();
+  const toast = useToast();
+  const connectedToWrongNetwork =
+    wallet.status === "connected" &&
+    wallet.chainId &&
+    Number(wallet.chainId) !== chainConfig.chainId;
+
+  const handleSwitchNetwork = async () => {
+    try {
+      await switchToConfiguredNetwork();
+    } catch (error) {
+      toast({
+        title: "Network switch failed",
+        description: error.message,
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const walletMenuLabel = connectedToWrongNetwork
+    ? "Wrong Network"
+    : shortAddress(wallet.account);
 
   return (
     <Box>
@@ -43,8 +70,8 @@ export default function NavBar() {
         css={{
           backdropFilter: "saturate(180%) blur(5px)",
           backgroundColor: useColorModeValue(
-            "rgba(255, 255, 255, 0.8)",
-            "rgba(26, 32, 44, 0.8)"
+            "rgba(8, 69, 76, 0.8)",
+            "rgba(248, 252, 252, 0.8)"
           ),
         }}
       >
@@ -53,27 +80,12 @@ export default function NavBar() {
             <Heading
               textAlign="left"
               fontFamily={"heading"}
-              color={useColorModeValue("teal.800", "white")}
+              color={useColorModeValue("teal.900", "white")}
               as="h2"
               size="lg"
             >
-              <Box
-                as={"span"}
-                color={useColorModeValue("teal.400", "teal.300")}
-                position={"relative"}
-                zIndex={10}
-                _after={{
-                  content: '""',
-                  position: "absolute",
-                  left: 0,
-                  bottom: 0,
-                  w: "full",
-                  h: "30%",
-                  bg: useColorModeValue("teal.100", "teal.900"),
-                  zIndex: -1,
-                }}
-              >
-                <NextLink href="/">🤝BetterFund</NextLink>
+              <Box>
+                <NextLink href="/">🤝TrustedFund</NextLink>
               </Box>
             </Heading>
           </Flex>
@@ -103,10 +115,21 @@ export default function NavBar() {
 
             {wallet.status === "connected" ? (
               <Menu>
-                <MenuButton as={Button} rightIcon={<ChevronDownIcon />}>
-                  {wallet.account.substr(0, 10) + "..."}
+                <MenuButton
+                  as={Button}
+                  colorScheme={connectedToWrongNetwork ? "red" : "teal"}
+                  variant={connectedToWrongNetwork ? "solid" : "outline"}
+                  rightIcon={<ChevronDownIcon />}
+                >
+                  {walletMenuLabel}
                 </MenuButton>
                 <MenuList>
+                  <MenuItem isDisabled>{shortAddress(wallet.account, 10, 8)}</MenuItem>
+                  {connectedToWrongNetwork ? (
+                    <MenuItem onClick={handleSwitchNetwork}>
+                      Switch to {chainConfig.chainName}
+                    </MenuItem>
+                  ) : null}
                   <MenuItem onClick={() => wallet.reset()}>
                     {" "}
                     Disconnect Wallet{" "}
@@ -132,11 +155,49 @@ export default function NavBar() {
               </div>
             )}
 
+            {!isBlockchainConfigured ? (
+              <Badge colorScheme="yellow" alignSelf="center">
+                Setup Needed
+              </Badge>
+            ) : null}
             <DarkModeSwitch />
           </Stack>
 
           <Flex display={{ base: "flex", md: "none" }}>
             <DarkModeSwitch />
+            <Menu>
+              <MenuButton
+                as={IconButton}
+                aria-label="Open navigation"
+                icon={<HamburgerIcon />}
+                variant="ghost"
+                ml={2}
+              />
+              <MenuList>
+                <NextLink href="/campaign/new" passHref>
+                  <MenuItem as="a">Create Campaign</MenuItem>
+                </NextLink>
+                <NextLink href="/#howitworks" passHref>
+                  <MenuItem as="a">How it Works</MenuItem>
+                </NextLink>
+                {wallet.status === "connected" ? (
+                  <>
+                    {connectedToWrongNetwork ? (
+                      <MenuItem onClick={handleSwitchNetwork}>
+                        Switch to {chainConfig.chainName}
+                      </MenuItem>
+                    ) : null}
+                    <MenuItem onClick={() => wallet.reset()}>
+                      Disconnect Wallet
+                    </MenuItem>
+                  </>
+                ) : (
+                  <MenuItem onClick={() => wallet.connect()}>
+                    Connect Wallet
+                  </MenuItem>
+                )}
+              </MenuList>
+            </Menu>
           </Flex>
         </Container>
       </Flex>
