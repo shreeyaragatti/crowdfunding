@@ -52,14 +52,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (!supabaseAdmin) {
-    res.status(500).json({
-      error:
-        "Supabase admin client is not configured. Set SUPABASE_SERVICE_ROLE_KEY in .env.",
-    });
-    return;
-  }
-
   try {
     const { fields, files } = await parseForm(req);
     const image = getSingleValue(files.image);
@@ -72,6 +64,14 @@ export default async function handler(req, res) {
     if (!ALLOWED_TYPES.has(image.mimetype || "")) {
       res.status(400).json({
         error: "Campaign image must be a JPG, PNG, WEBP, or GIF file.",
+      });
+      return;
+    }
+
+    // Require Supabase for image uploads
+    if (!supabaseAdmin) {
+      res.status(500).json({
+        error: "Supabase is not configured. Set SUPABASE_SERVICE_ROLE_KEY in .env to enable image uploads.",
       });
       return;
     }
@@ -114,6 +114,7 @@ export default async function handler(req, res) {
       publicUrl: data.publicUrl,
     });
   } catch (error) {
+    console.error("Campaign image upload error:", error);
     res.status(500).json({
       error: error.message || "Campaign image upload failed.",
     });

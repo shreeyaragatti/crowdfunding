@@ -27,6 +27,9 @@ import {
   Alert,
   AlertIcon,
   AlertDescription,
+  Switch,
+  FormControl,
+  FormLabel,
 } from "@chakra-ui/react";
 
 import factory from "../smart-contract/factory";
@@ -37,6 +40,7 @@ import { FaHandshake } from "react-icons/fa";
 import { FcShare, FcDonate, FcMoneyTransfer } from "react-icons/fc";
 import { isBlockchainConfigured } from "../lib/blockchainConfig";
 import ProjectSetupStatus from "../components/ProjectSetupStatus";
+import { useDevMode } from "../lib/devModeContext";
 
 export async function getServerSideProps(context) {
   try {
@@ -218,13 +222,27 @@ function CampaignCard({
 
 export default function Home({ campaigns, loadError }) {
   const [campaignList, setCampaignList] = useState([]);
+  const [devCampaigns, setDevCampaigns] = useState([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(true);
   const [campaignError, setCampaignError] = useState(loadError || "");
   const [ethPrice, updateEthPrice] = useState(null);
+  const { devMode, toggleDevMode, isLoading: isDevModeLoading } = useDevMode();
 
   async function getEthMarketPrice() {
     const ETHPrice = await getETHPrice();
     updateEthPrice(ETHPrice);
+  }
+
+  async function fetchDevCampaigns() {
+    try {
+      const response = await fetch("/api/campaign-metadata");
+      if (response.ok) {
+        const data = await response.json();
+        setDevCampaigns(data.campaigns || []);
+      }
+    } catch (err) {
+      console.log("Could not fetch dev campaigns:", err.message);
+    }
   }
 
   async function getSummary() {
@@ -249,6 +267,7 @@ export default function Home({ campaigns, loadError }) {
 
   useEffect(() => {
     getEthMarketPrice();
+    fetchDevCampaigns();
 
     if (campaigns.length > 0) {
       getSummary();
@@ -270,16 +289,39 @@ export default function Home({ campaigns, loadError }) {
       <main className={styles.main}>
         <Container py={{ base: "4", md: "12" }} maxW={"7xl"} align={"left"}>
           <ProjectSetupStatus />
-          {" "}
-          <Heading
-            textAlign={useBreakpointValue({ base: "left" })}
-            fontFamily={"heading"}
-            color={useColorModeValue("gray.800", "white")}
-            as="h1"
-            py={4}
-          >
-            Crowdfunding using the powers of <br /> Crypto & Blockchain 😄{" "}
-          </Heading>
+          <Flex justify="space-between" align="center" mb={6}>
+            <Heading
+              textAlign={useBreakpointValue({ base: "left" })}
+              fontFamily={"heading"}
+              color={useColorModeValue("gray.800", "white")}
+              as="h1"
+              py={4}
+            >
+              Crowdfunding using the powers of <br /> Crypto & Blockchain 😄{" "}
+            </Heading>
+          </Flex>
+          
+          {!isDevModeLoading && (
+            <Box mb={6} p={4} bg={useColorModeValue("gray.50", "gray.700")} rounded="md" borderWidth="1px">
+              <FormControl display="flex" alignItems="center">
+                <FormLabel mb={0} fontWeight="600">
+                  🔧 Development Mode (Bypass Payment Verification)
+                </FormLabel>
+                <Switch
+                  isChecked={devMode}
+                  onChange={(e) => toggleDevMode(e.target.checked)}
+                  ml={4}
+                  colorScheme="teal"
+                />
+              </FormControl>
+              {devMode && (
+                <Text fontSize="sm" color={useColorModeValue("gray.600", "gray.300")} mt={2}>
+                  ✓ Dev mode enabled: You can create campaigns and interact without MetaMask balance verification.
+                </Text>
+              )}
+            </Box>
+          )}
+
           <NextLink href="/campaign/new">
             <Button
               display={{ sm: "inline-flex" }}
@@ -318,11 +360,12 @@ export default function Home({ campaigns, loadError }) {
               <Skeleton height="25rem" />
               <Skeleton height="25rem" />
             </SimpleGrid>
-          ) : campaignList.length > 0 ? (
+          ) : campaignList.length > 0 || devCampaigns.length > 0 ? (
             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10} py={8}>
+              {/* Blockchain Campaigns */}
               {campaignList.map((el, i) => {
                 return (
-                  <div key={i}>
+                  <div key={`blockchain-${i}`}>
                     <CampaignCard
                       name={el[5]}
                       description={el[6]}
@@ -333,6 +376,121 @@ export default function Home({ campaigns, loadError }) {
                       balance={el[1]}
                       ethPrice={ethPrice}
                     />
+                  </div>
+                );
+              })}
+              {/* Dev Mode Campaigns */}
+              {devCampaigns.map((campaign, i) => {
+                const targetEth = Number(campaign.targetWei) / 1e18;
+                return (
+                  <div key={`devmode-${i}`}>
+                    <Box
+                      bg={useColorModeValue("white", "gray.800")}
+                      maxW={{ md: "sm" }}
+                      borderWidth="1px"
+                      rounded="lg"
+                      shadow="lg"
+                      position="relative"
+                      alignItems="center"
+                      justifyContent="center"
+                      opacity={0.85}
+                      border="2px solid"
+                      borderColor={useColorModeValue("gray.300", "gray.600")}
+                    >
+                      <Box height="18em" position="relative">
+                        <Img
+                          src={campaign.imageUrl}
+                          alt={`Picture of ${campaign.name}`}
+                          fallbackSrc="/static/no-requests.png"
+                          roundedTop="lg"
+                          objectFit="cover"
+                          w="full"
+                          h="full"
+                          display="block"
+                        />
+                        <Box
+                          position="absolute"
+                          top={2}
+                          right={2}
+                          bg="yellow.400"
+                          color="black"
+                          px={2}
+                          py={1}
+                          rounded="md"
+                          fontSize="xs"
+                          fontWeight="bold"
+                        >
+                          🔧 Dev Mode
+                        </Box>
+                      </Box>
+                      <Box p="6">
+                        <Flex
+                          mt="1"
+                          justifyContent="space-between"
+                          alignContent="center"
+                          py={2}
+                        >
+                          <Box
+                            fontSize="2xl"
+                            fontWeight="semibold"
+                            as="h4"
+                            lineHeight="tight"
+                            isTruncated
+                          >
+                            {campaign.name}
+                          </Box>
+                          <Tooltip
+                            label="Test Campaign (Dev Mode)"
+                            bg={useColorModeValue("white", "gray.700")}
+                            placement={"top"}
+                            color={useColorModeValue("gray.800", "white")}
+                            fontSize={"0.9em"}
+                          >
+                            <chakra.a display={"flex"}>
+                              <Icon
+                                as={FaHandshake}
+                                h={7}
+                                w={7}
+                                alignSelf={"center"}
+                                color={"yellow.500"}
+                              />
+                            </chakra.a>
+                          </Tooltip>
+                        </Flex>
+                        <Flex alignContent="center" py={2}>
+                          <Text color={"gray.500"} pr={2}>
+                            by
+                          </Text>
+                          <Heading size="base" isTruncated>
+                            {campaign.creatorAddress?.slice(0, 8)}...
+                          </Heading>
+                        </Flex>
+                        <Flex direction="row" py={2}>
+                          <Box w="full">
+                            <Box
+                              fontSize={"2xl"}
+                              isTruncated
+                              maxW={{ base: "15rem", sm: "sm" }}
+                              pt="2"
+                            >
+                              <Text as="span" fontWeight={"bold"}>
+                                0 (Test)
+                              </Text>
+                            </Box>
+                            <Text fontSize={"md"} fontWeight="normal">
+                              target of {targetEth} ETH
+                            </Text>
+                            <Progress
+                              colorScheme="yellow"
+                              size="sm"
+                              value={0}
+                              max={targetEth}
+                              mt="2"
+                            />
+                          </Box>
+                        </Flex>
+                      </Box>
+                    </Box>
                   </div>
                 );
               })}

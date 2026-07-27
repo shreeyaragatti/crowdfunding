@@ -1,20 +1,63 @@
-import supabaseAdmin from "../../lib/supabaseAdmin";
+import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    res.status(405).json({ error: "Method not allowed" });
-    return;
+  if (req.method === "GET") {
+    return handleGet(req, res);
+  } else if (req.method === "POST") {
+    return handlePost(req, res);
   }
 
+  res.setHeader("Allow", "GET, POST");
+  res.status(405).json({ error: "Method not allowed" });
+}
+
+async function handleGet(req, res) {
   try {
-    if (!supabaseAdmin) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      // Return empty list if not configured
+      return res.status(200).json({ campaigns: [] });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data: campaigns, error } = await supabase
+      .from("campaign_metadata")
+      .select("*")
+      .in("status", ["created", "deployed"])
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    res.status(200).json({ campaigns: campaigns || [] });
+  } catch (error) {
+    console.error("Error fetching campaign metadata:", error);
+    res.status(500).json({
+      error: error.message || "Could not fetch campaign metadata.",
+    });
+  }
+}
+
+async function handlePost(req, res) {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
       res.status(500).json({
         error:
-          "Supabase admin client is not configured. Set SUPABASE_SERVICE_ROLE_KEY in .env.",
+          "Supabase not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.",
       });
       return;
     }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
     const {
       contractAddress,
@@ -25,6 +68,7 @@ export default async function handler(req, res) {
       targetWei,
       minimumContributionWei,
       transactionHash,
+      devMode,
     } = req.body || {};
 
     if (
@@ -38,10 +82,10 @@ export default async function handler(req, res) {
       return;
     }
 
-    const addressKey = contractAddress || `pending:${transactionHash}`;
-    const status = contractAddress ? "deployed" : "created";
+    const addressKey = contractAddress || `dev:${Date.now()}`;
+    const status = devMode ? "created" : "deployed";
 
-    const { data, error } = await supabaseAdmin
+    const { data: campaign, error } = await supabase
       .from("campaign_metadata")
       .upsert(
         {
@@ -50,9 +94,9 @@ export default async function handler(req, res) {
           name,
           description,
           image_url: imageUrl,
-          target_wei: targetWei,
-          minimum_contribution_wei: minimumContributionWei,
-          transaction_hash: transactionHash,
+          target_wei: String(targetWei),
+          minimum_contribution_wei: String(minimumContributionWei),
+          transaction_hash: transactionHash || null,
           status,
           updated_at: new Date().toISOString(),
         },
@@ -61,12 +105,11 @@ export default async function handler(req, res) {
       .select()
       .single();
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    res.status(200).json({ campaign: data });
+    res.status(200).json({ campaign });
   } catch (error) {
+    console.error("Error saving campaign metadata:", error);
     res.status(500).json({
       error: error.message || "Campaign metadata could not be saved.",
     });

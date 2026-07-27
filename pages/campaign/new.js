@@ -33,6 +33,7 @@ import factory from "../../smart-contract/factory";
 import web3 from "../../smart-contract/web3";
 import { isBlockchainConfigured } from "../../lib/blockchainConfig";
 import { connectInjectedWallet } from "../../lib/wallet";
+import { useDevMode } from "../../lib/devModeContext";
 
 export default function NewCampaign() {
   const {
@@ -52,6 +53,7 @@ export default function NewCampaign() {
   const [ETHPrice, setETHPrice] = useState(0);
   const [imagePreview, setImagePreview] = useState("");
   const [selectedImageName, setSelectedImageName] = useState("");
+  const { devMode } = useDevMode();
   useAsync(async () => {
     try {
       const result = await getETHPrice();
@@ -65,17 +67,23 @@ export default function NewCampaign() {
     formData.append("image", file);
     formData.append("creator", creator);
 
-    const response = await fetch("/api/campaign-image", {
-      method: "POST",
-      body: formData,
-    });
-    const result = await response.json();
+    try {
+      const response = await fetch("/api/campaign-image", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
 
-    if (!response.ok) {
-      throw new Error(result.error || "Campaign image upload failed.");
+      if (!response.ok) {
+        console.warn("Image upload failed:", result.error);
+        throw new Error(result.error || "Campaign image upload failed.");
+      }
+
+      return result.publicUrl;
+    } catch (err) {
+      console.error("Image upload error:", err);
+      throw err;
     }
-
-    return result.publicUrl;
   };
 
   async function onSubmit(data) {
@@ -94,11 +102,23 @@ export default function NewCampaign() {
 
       const accounts = await web3.eth.getAccounts();
       const imageFile = data.imageFile && data.imageFile[0];
-      const imageUrl = imageFile
-        ? await uploadCampaignImage(imageFile, accounts[0])
-        : data.imageUrl;
+      
+      // Try to upload image file, or use provided URL
+      let imageUrl = null;
+      if (imageFile) {
+        try {
+          imageUrl = await uploadCampaignImage(imageFile, accounts[0] || "anonymous");
+        } catch (err) {
+          setError(`Image upload failed: ${err.message}`);
+          throw err;
+        }
+      } else if (data.imageUrl) {
+        imageUrl = data.imageUrl;
+      }
 
+      // Image is required
       if (!imageUrl) {
+        setError("Please upload an image or provide an image URL.");
         throw new Error("Upload a campaign image or paste an image URL.");
       }
 
@@ -108,42 +128,95 @@ export default function NewCampaign() {
       );
       const targetWei = web3.utils.toWei(data.target, "ether");
 
-      const receipt = await factory.methods
-        .createCampaign(
-          minimumContributionWei,
-          data.campaignName,
-          data.description,
-          imageUrl,
-          targetWei
-        )
-        .send({
-          from: accounts[0],
-        });
+      // Generate a consistent dev mode address based on campaign name
+      const devModeAddress = `0xdev${Math.random().toString(16).slice(2, 10)}`;
+      const creatorAddress = accounts[0] || devModeAddress;
 
-      const contractAddress =
-        receipt.events &&
-        receipt.events.CampaignCreated &&
-        receipt.events.CampaignCreated.returnValues &&
-        receipt.events.CampaignCreated.returnValues.campaign;
-
-      await fetch("/api/campaign-metadata", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contractAddress,
-          creatorAddress: accounts[0],
-          name: data.campaignName,
+      // In dev mode, skip the actual blockchain transaction
+      if (devMode) {
+        // Log the campaign creation details instead of sending to blockchain
+        console.log("🔧 DEV MODE: Campaign creation skipped (no blockchain transaction)");
+        console.log({
+          minimumContribution: minimumContributionWei,
+          campaignName: data.campaignName,
           description: data.description,
           imageUrl,
-          minimumContributionWei,
-          targetWei,
-          transactionHash: receipt.transactionHash,
-        }),
-      });
+          target: targetWei,
+          creator: creatorAddress,
+        });
 
-      router.push("/");
+        // Save metadata to database
+        const metadataResponse = await fetch("/api/campaign-metadata", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contractAddress: devModeAddress,
+            creatorAddress,
+            name: data.campaignName,
+            description: data.description,
+            imageUrl,
+            minimumContributionWei,
+            targetWei,
+            transactionHash: "0xDEVMODE",
+            devMode: true,
+          }),
+        });
+
+        if (!metadataResponse.ok) {
+          const error = await metadataResponse.json();
+          throw new Error(error.error || "Failed to save campaign metadata");
+        }
+
+        toast({
+          title: "✓ Campaign created (Dev Mode)",
+          description: "Campaign created and saved with image. No blockchain transaction sent.",
+          status: "success",
+          duration: 5000,
+          isClosable: true,
+        });
+
+        router.push("/");
+      } else {
+        // Normal production flow with blockchain
+        const receipt = await factory.methods
+          .createCampaign(
+            minimumContributionWei,
+            data.campaignName,
+            data.description,
+            imageUrl,
+            targetWei
+          )
+          .send({
+            from: creatorAddress,
+          });
+
+        const contractAddress =
+          receipt.events &&
+          receipt.events.CampaignCreated &&
+          receipt.events.CampaignCreated.returnValues &&
+          receipt.events.CampaignCreated.returnValues.campaign;
+
+        await fetch("/api/campaign-metadata", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contractAddress,
+            creatorAddress,
+            name: data.campaignName,
+            description: data.description,
+            imageUrl,
+            minimumContributionWei,
+            targetWei,
+            transactionHash: receipt.transactionHash,
+          }),
+        });
+
+        router.push("/");
+      }
     } catch (err) {
       setError(err.message);
       console.log(err);
@@ -224,7 +297,7 @@ export default function NewCampaign() {
                   />
                 </FormControl>
                 <FormControl id="imageUrl">
-                  <FormLabel>Campaign Image</FormLabel>
+                  <FormLabel>Campaign Image *</FormLabel>
                   <Input
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/gif"
@@ -254,13 +327,14 @@ export default function NewCampaign() {
                     />
                   ) : null}
                   <FormHelperText>
-                    Or paste an image URL if the image is already hosted.
+                    Upload an image, or paste an image URL below (at least one required)
                   </FormHelperText>
                   <Input
                     {...register("imageUrl")}
                     isDisabled={isSubmitting}
                     type="url"
                     mt={2}
+                    placeholder="Or paste an image URL..."
                   />
                 </FormControl>
                 <FormControl id="target">
@@ -302,8 +376,16 @@ export default function NewCampaign() {
                     </AlertDescription>
                   </Alert>
                 ) : null}
+                {devMode && (
+                  <Alert status="info" rounded="md">
+                    <AlertIcon />
+                    <AlertDescription mr={2}>
+                      🔧 Dev Mode Active: Wallet verification is bypassed. Your campaign will be saved without blockchain verification.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <Stack spacing={10}>
-                  {wallet.status === "connected" ? (
+                  {wallet.status === "connected" || devMode ? (
                     <Button
                       bg={"teal.400"}
                       color={"white"}
