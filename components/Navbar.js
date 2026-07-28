@@ -104,7 +104,7 @@ export default function NavBar() {
               size="lg"
             >
               <Box>
-                <NextLink href="/">🤝TrustedFund</NextLink>
+                <NextLink href="/">BetterFund</NextLink>
               </Box>
             </Heading>
           </Flex>
@@ -122,6 +122,14 @@ export default function NavBar() {
               display={{ base: "none", md: "inline-flex" }}
             >
               <NextLink href="/campaign/new">Create Campaign</NextLink>
+            </Button>
+            <Button
+              fontSize={"md"}
+              fontWeight={600}
+              variant={"link"}
+              display={{ base: "none", md: "inline-flex" }}
+            >
+              <NextLink href="/recommendations">Recommendations</NextLink>
             </Button>
             <Button
               fontSize={"md"}

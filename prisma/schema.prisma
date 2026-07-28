@@ -17,10 +17,19 @@ model CampaignMetadata {
   minimumContributionWei String   @map("minimum_contribution_wei")
   transactionHash        String?  @map("transaction_hash")
   status                 String   @default("draft")
+  
+  // New metadata fields for AI assistant
+  category               String?  @default("general") // e.g., "education", "medical", "emergency", "community", "elderly-care", "child-welfare"
+  beneficiaryType        String?  @default("general") // e.g., "students", "elders", "children", "families", "disabled", "underprivileged"
+  beneficiaryCount       Int?     @default(1)         // estimated number of beneficiaries
+  location               String?                      // geographic location/region
+  urgencyLevel           String?  @default("normal")  // e.g., "normal", "urgent", "emergency"
   createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([creatorAddress], map: "campaign_metadata_creator_address_prisma_idx")
+  @@index([category], map: "campaign_metadata_category_prisma_idx")
+  @@index([beneficiaryType], map: "campaign_metadata_beneficiary_type_prisma_idx")
   @@map("campaign_metadata")
 }
 
@@ -52,4 +61,35 @@ model ChainEvent {
 
   @@unique([transactionHash, eventName], map: "chain_events_transaction_event_idx")
   @@map("chain_events")
+}
+
+model CampaignDonation {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignAddress String   @map("campaign_address")
+  donorAddress    String   @map("donor_address")
+  donorName       String?  @map("donor_name")
+  amountWei       String   @map("amount_wei")
+  message         String?
+  transactionHash String?  @map("transaction_hash")
+  source          String   @default("dev")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([campaignAddress], map: "campaign_donations_campaign_address_prisma_idx")
+  @@map("campaign_donations")
+}
+
+model CampaignProof {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignAddress String   @map("campaign_address")
+  uploaderAddress String?  @map("uploader_address")
+  title           String
+  description     String
+  proofUrl        String?  @map("proof_url")
+  proofPath       String?  @map("proof_path")
+  proofType       String?  @map("proof_type")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([campaignAddress], map: "campaign_proofs_campaign_address_prisma_idx")
+  @@map("campaign_proofs")
 }

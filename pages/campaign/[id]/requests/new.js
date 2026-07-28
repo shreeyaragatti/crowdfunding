@@ -104,7 +104,7 @@ export default function NewRequest() {
             </NextLink>
           </Text>
           <Stack>
-            <Heading fontSize={"4xl"}>Create a Withdrawal Request 💸</Heading>
+            <Heading fontSize={"4xl"}>Create a Withdrawal Request</Heading>
           </Stack>
           <Box
             rounded={"lg"}

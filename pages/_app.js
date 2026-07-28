@@ -4,6 +4,7 @@ import { UseWalletProvider } from "use-wallet";
 import NavBar from "../components/Navbar";
 import Footer from "../components/Footer";
 import WalletAutoConnect from "../components/WalletAutoConnect";
+import FloatingChatWidget from "../components/FloatingChatWidget";
 import { DevModeProvider } from "../lib/devModeContext";
 import "@fontsource/space-grotesk";
 import chainConfig from "../lib/blockchainConfig";
@@ -33,6 +34,7 @@ function MyApp({ Component, pageProps }) {
             <NavBar />
             <Component {...pageProps} />
             <Footer />
+            <FloatingChatWidget />
           </DevModeProvider>
         </UseWalletProvider>
       </ChakraProvider>

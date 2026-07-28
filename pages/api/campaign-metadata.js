@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { serializeCampaign } from "../../lib/campaignSerializers";
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
@@ -25,15 +26,27 @@ async function handleGet(req, res) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const { data: campaigns, error } = await supabase
+    let query = supabase
       .from("campaign_metadata")
       .select("*")
-      .in("status", ["created", "deployed"])
-      .order("created_at", { ascending: false });
+      .in("status", ["created", "deployed"]);
+
+    if (req.query.id) {
+      query = query.eq("contract_address", String(req.query.id)).maybeSingle();
+    } else {
+      query = query.order("created_at", { ascending: false });
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
-    res.status(200).json({ campaigns: campaigns || [] });
+    if (req.query.id) {
+      res.status(200).json({ campaign: serializeCampaign(data) });
+      return;
+    }
+
+    res.status(200).json({ campaigns: (data || []).map(serializeCampaign) });
   } catch (error) {
     console.error("Error fetching campaign metadata:", error);
     res.status(500).json({
@@ -69,6 +82,11 @@ async function handlePost(req, res) {
       minimumContributionWei,
       transactionHash,
       devMode,
+      category,
+      beneficiaryType,
+      beneficiaryCount,
+      location,
+      urgencyLevel,
     } = req.body || {};
 
     if (
@@ -87,27 +105,28 @@ async function handlePost(req, res) {
 
     const { data: campaign, error } = await supabase
       .from("campaign_metadata")
-      .upsert(
-        {
-          contract_address: addressKey,
-          creator_address: creatorAddress,
-          name,
-          description,
-          image_url: imageUrl,
-          target_wei: String(targetWei),
-          minimum_contribution_wei: String(minimumContributionWei),
-          transaction_hash: transactionHash || null,
-          status,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "contract_address" }
-      )
+      .insert({
+        contract_address: addressKey,
+        creator_address: creatorAddress,
+        name,
+        description,
+        image_url: imageUrl,
+        target_wei: String(targetWei),
+        minimum_contribution_wei: String(minimumContributionWei),
+        transaction_hash: transactionHash || null,
+        status,
+        category: category || "general",
+        beneficiary_type: beneficiaryType || "general",
+        beneficiary_count: beneficiaryCount || 1,
+        location: location || null,
+        urgency_level: urgencyLevel || "normal",
+      })
       .select()
       .single();
 
     if (error) throw error;
 
-    res.status(200).json({ campaign });
+    res.status(200).json({ campaign: serializeCampaign(campaign) });
   } catch (error) {
     console.error("Error saving campaign metadata:", error);
     res.status(500).json({

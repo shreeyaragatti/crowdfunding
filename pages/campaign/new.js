@@ -24,6 +24,7 @@ import {
   Textarea,
   useToast,
   Image,
+  Select,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
 import { ArrowBackIcon } from "@chakra-ui/icons";
@@ -94,13 +95,13 @@ export default function NewCampaign() {
       data.target
     );
     try {
-      if (!isBlockchainConfigured || !factory) {
+      if (!devMode && (!isBlockchainConfigured || !factory)) {
         throw new Error(
           "Blockchain settings are not complete. Add RPC and factory contract values to .env or .env.local."
         );
       }
 
-      const accounts = await web3.eth.getAccounts();
+      const accounts = await web3.eth.getAccounts().catch(() => []);
       const imageFile = data.imageFile && data.imageFile[0];
       
       // Try to upload image file, or use provided URL
@@ -135,7 +136,7 @@ export default function NewCampaign() {
       // In dev mode, skip the actual blockchain transaction
       if (devMode) {
         // Log the campaign creation details instead of sending to blockchain
-        console.log("🔧 DEV MODE: Campaign creation skipped (no blockchain transaction)");
+        console.log("DEV MODE: Campaign creation skipped (no blockchain transaction)");
         console.log({
           minimumContribution: minimumContributionWei,
           campaignName: data.campaignName,
@@ -152,7 +153,7 @@ export default function NewCampaign() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            contractAddress: devModeAddress,
+            contractAddress: null,
             creatorAddress,
             name: data.campaignName,
             description: data.description,
@@ -161,6 +162,11 @@ export default function NewCampaign() {
             targetWei,
             transactionHash: "0xDEVMODE",
             devMode: true,
+            category: data.category || "other",
+            beneficiaryType: data.beneficiaryType || "general",
+            beneficiaryCount: parseInt(data.beneficiaryCount) || 1,
+            location: data.location || null,
+            urgencyLevel: data.urgencyLevel || "normal",
           }),
         });
 
@@ -169,15 +175,18 @@ export default function NewCampaign() {
           throw new Error(error.error || "Failed to save campaign metadata");
         }
 
+        const campaignData = await metadataResponse.json();
+        const campaignId = campaignData.campaign?.id;
+
         toast({
-          title: "✓ Campaign created (Dev Mode)",
+          title: "Campaign created",
           description: "Campaign created and saved with image. No blockchain transaction sent.",
           status: "success",
           duration: 5000,
           isClosable: true,
         });
 
-        router.push("/");
+        router.push(campaignId ? `/campaign/${campaignId}` : "/");
       } else {
         // Normal production flow with blockchain
         const receipt = await factory.methods
@@ -212,6 +221,11 @@ export default function NewCampaign() {
             minimumContributionWei,
             targetWei,
             transactionHash: receipt.transactionHash,
+            category: data.category || "other",
+            beneficiaryType: data.beneficiaryType || "general",
+            beneficiaryCount: parseInt(data.beneficiaryCount) || 1,
+            location: data.location || null,
+            urgencyLevel: data.urgencyLevel || "normal",
           }),
         });
 
@@ -245,13 +259,13 @@ export default function NewCampaign() {
         <link rel="icon" href="/logo.svg" />
       </Head>
       <main>
-        <Stack spacing={8} mx={"auto"} maxW={"2xl"} py={12} px={6}>
+        <Stack spacing={8} mx={"auto"} maxW={"2xl"} py={12} px={6} mt={{ base: "80px", md: "80px" }}>
           <Text fontSize={"lg"} color={"teal.400"}>
             <ArrowBackIcon mr={2} />
             <NextLink href="/"> Back to Home</NextLink>
           </Text>
           <Stack>
-            <Heading fontSize={"4xl"}>Create a New Campaign 📢</Heading>
+            <Heading fontSize={"4xl"}>Create a New Campaign</Heading>
           </Stack>
           <Box
             rounded={"lg"}
@@ -288,6 +302,82 @@ export default function NewCampaign() {
                     {...register("campaignName", { required: true })}
                     isDisabled={isSubmitting}
                   />
+                </FormControl>
+                <FormControl id="category">
+                  <FormLabel>Campaign Category</FormLabel>
+                  <Select
+                    {...register("category")}
+                    isDisabled={isSubmitting}
+                    placeholder="Select a category (optional)"
+                  >
+                    <option value="education">Education</option>
+                    <option value="medical">Medical Support</option>
+                    <option value="emergency">Emergency Relief</option>
+                    <option value="community">Community Development</option>
+                    <option value="disaster">Disaster Relief</option>
+                    <option value="other">Other</option>
+                  </Select>
+                  <FormHelperText>
+                    Help donors find campaigns by cause
+                  </FormHelperText>
+                </FormControl>
+                <FormControl id="beneficiaryType">
+                  <FormLabel>Who will benefit? (Beneficiary Type)</FormLabel>
+                  <Select
+                    {...register("beneficiaryType")}
+                    isDisabled={isSubmitting}
+                    placeholder="Select beneficiary type (optional)"
+                  >
+                    <option value="students">Students</option>
+                    <option value="elders">Elders</option>
+                    <option value="children">Children</option>
+                    <option value="families">Families</option>
+                    <option value="disabled">Disabled/PWD</option>
+                    <option value="underprivileged">Underprivileged</option>
+                    <option value="community">Community</option>
+                  </Select>
+                  <FormHelperText>
+                    The primary group that will benefit from this campaign
+                  </FormHelperText>
+                </FormControl>
+                <FormControl id="beneficiaryCount">
+                  <FormLabel>Estimated Number of Beneficiaries</FormLabel>
+                  <Input
+                    type="number"
+                    min="1"
+                    {...register("beneficiaryCount")}
+                    isDisabled={isSubmitting}
+                    placeholder="e.g., 50 students, 100 families"
+                  />
+                  <FormHelperText>
+                    How many people will this campaign help?
+                  </FormHelperText>
+                </FormControl>
+                <FormControl id="location">
+                  <FormLabel>Location/Region</FormLabel>
+                  <Input
+                    {...register("location")}
+                    isDisabled={isSubmitting}
+                    placeholder="e.g., Kerala, Mumbai, or Country"
+                  />
+                  <FormHelperText>
+                    Where is this campaign focused? (optional)
+                  </FormHelperText>
+                </FormControl>
+                <FormControl id="urgencyLevel">
+                  <FormLabel>Urgency Level</FormLabel>
+                  <Select
+                    {...register("urgencyLevel")}
+                    isDisabled={isSubmitting}
+                    placeholder="Select urgency level (optional)"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="emergency">Emergency</option>
+                  </Select>
+                  <FormHelperText>
+                    How urgent is this campaign?
+                  </FormHelperText>
                 </FormControl>
                 <FormControl id="description">
                   <FormLabel>Campaign Description</FormLabel>
@@ -380,7 +470,7 @@ export default function NewCampaign() {
                   <Alert status="info" rounded="md">
                     <AlertIcon />
                     <AlertDescription mr={2}>
-                      🔧 Dev Mode Active: Wallet verification is bypassed. Your campaign will be saved without blockchain verification.
+                      Dev mode active: this campaign will be saved to Supabase without blockchain verification.
                     </AlertDescription>
                   </Alert>
                 )}

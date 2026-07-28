@@ -10,7 +10,7 @@ import {
   Heading,
   useBreakpointValue,
 } from "@chakra-ui/react";
-import { FaInstagram, FaTwitter, FaGithub, FaGlobe } from "react-icons/fa";
+import { FaGithub } from "react-icons/fa";
 import NextLink from "next/link";
 
 const SocialButton = ({ children, label, href }) => {
@@ -76,7 +76,7 @@ export default function Footer() {
               zIndex: -1,
             }}
           >
-            <NextLink href="/">🤝TrustedFund</NextLink>
+            <NextLink href="/">BetterFund</NextLink>
           </Box>
         </Heading>
         <Stack direction={"row"} spacing={6}>
@@ -102,7 +102,7 @@ export default function Footer() {
           justify={{ base: "center", md: "space-between" }}
           align={{ base: "center", md: "center" }}
         >
-          <Text>🌐 Made by psss</Text>
+          <Text>Built for transparent giving</Text>
           <Stack direction={"row"} spacing={6}>
             
             

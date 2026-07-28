@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title>No requests</title>
+  <desc>Illustration showing no requests available</desc>
+  <rect width="240" height="240" rx="30" fill="#E6FFFA" />
+  <circle cx="120" cy="100" r="30" fill="#38B2AC" opacity="0.2" />
+  <path d="M80 140h80v16H80z" fill="#319795" />
+  <path d="M80 80h80v16H80z" fill="#319795" />
+  <path d="M80 110h80v16H80z" fill="#319795" />
+  <text x="120" y="195" text-anchor="middle" fill="#2C7A7B" font-family="Inter, sans-serif" font-size="18" font-weight="700">No requests yet</text>
+</svg>
