@@ -208,7 +208,7 @@ export default function Home({ campaigns, loadError }) {
                 fontSize={{ base: "4xl", md: "5xl" }}
                 lineHeight={1.05}
               >
-                Transparent crowdfunding for real-world impact.
+                AI-Enhanced Blockchain Fundraising Platform
               </Heading>
               <Text fontSize={{ base: "lg", md: "xl" }} color={useColorModeValue("gray.600", "gray.300")} mt={5}>
                 Discover and support campaigns with proof-backed transparency, trusted donor guidance, and a simple way to launch your own fundraiser.
