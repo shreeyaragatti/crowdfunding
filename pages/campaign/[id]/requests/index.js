@@ -491,7 +491,7 @@ export default function Requests({
                   }}
                 >
                   <NextLink href={`/campaign/${campaignId}/requests/new`}>
-                    Create Withdrawal Request
+                    <a>Create Withdrawal Request</a>
                   </NextLink>
                 </Button>
 
@@ -505,7 +505,7 @@ export default function Requests({
                   }}
                 >
                   <NextLink href={`/campaign/${campaignId}/`}>
-                    Go to Campaign
+                    <a>Go to Campaign</a>
                   </NextLink>
                 </Button>
               </SimpleGrid>

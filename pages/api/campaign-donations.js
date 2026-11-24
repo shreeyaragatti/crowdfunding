@@ -77,7 +77,7 @@ async function handlePost(req, res) {
         amount_wei: String(amountWei),
         message: message || null,
         transaction_hash: transactionHash || null,
-        source: source || "dev",
+        source: source || "blockchain",
       })
       .select()
       .single();

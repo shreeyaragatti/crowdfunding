@@ -53,7 +53,6 @@ import {
   serializeDonation,
   serializeProof,
 } from "../../lib/campaignSerializers";
-import { useDevMode } from "../../lib/devModeContext";
 import { connectInjectedWallet } from "../../lib/wallet";
 import CampaignAssistant from "../../components/CampaignAssistant";
 
@@ -71,9 +70,6 @@ const zeroSummary = {
 
 const isEthereumAddress = (value) => /^0x[a-fA-F0-9]{40}$/.test(value || "");
 
-const sumWei = (rows) =>
-  (rows || []).reduce((total, row) => total + BigInt(row.amount_wei || "0"), BigInt(0)).toString();
-
 async function getSupabaseCampaign(campaignId) {
   if (!supabaseAdmin) return null;
 
@@ -86,16 +82,7 @@ async function getSupabaseCampaign(campaignId) {
 
   if (byAddress) return byAddress;
   if (addressError && addressError.code !== "PGRST116") throw addressError;
-
-  // Try to find by ID (UUID for dev mode campaigns)
-  const { data: byId, error: idError } = await supabaseAdmin
-    .from("campaign_metadata")
-    .select("*")
-    .eq("id", campaignId)
-    .maybeSingle();
-
-  if (idError && idError.code !== "PGRST116") throw idError;
-  return byId;
+  return null;
 }
 
 async function getSupabaseChildren(campaignId) {
@@ -167,31 +154,6 @@ export async function getServerSideProps({ params }) {
     }
   }
 
-  if (supabaseCampaign) {
-    const donatedWei = sumWei(children.donations);
-
-    return {
-      props: {
-        id: campaignId,
-        effectiveAddress: campaignId,
-        minimumContribution: supabaseCampaign.minimum_contribution_wei,
-        balance: donatedWei,
-        requestsCount: "0",
-        approversCount: String(children.donations.length),
-        manager: supabaseCampaign.creator_address,
-        name: supabaseCampaign.name,
-        description: supabaseCampaign.description,
-        image: supabaseCampaign.image_url,
-        target: supabaseCampaign.target_wei,
-        ETHPrice,
-        loadError: "",
-        isSupabaseCampaign: true,
-        initialDonations: children.donations.map(serializeDonation),
-        initialProofs: children.proofs.map(serializeProof),
-      },
-    };
-  }
-
   return {
     props: {
       id: campaignId,
@@ -199,8 +161,8 @@ export async function getServerSideProps({ params }) {
       ...zeroSummary,
       ETHPrice,
       loadError:
-        "This campaign could not be loaded from Supabase or the configured Ethereum network.",
-      isSupabaseCampaign: false,
+        "This campaign could not be loaded from the configured Ethereum network.",
+      isSupabaseCampaign: Boolean(supabaseCampaign),
       initialDonations: [],
       initialProofs: [],
     },
@@ -299,7 +261,6 @@ export default function CampaignSingle(props) {
   const router = useRouter();
   const toast = useToast();
   const { width, height } = useWindowSize();
-  const { devMode } = useDevMode();
   const proofFileField = proofForm.register("proofFile");
   const pageBg = useColorModeValue("gray.50", "gray.900");
   const panelBg = useColorModeValue("white", "gray.800");
@@ -330,7 +291,7 @@ export default function CampaignSingle(props) {
       const nextBalance = (donationData.donations || [])
         .reduce((total, donation) => total + BigInt(donation.amountWei || "0"), BigInt(0))
         .toString();
-      if (isSupabaseCampaign || devMode) setDisplayBalance(nextBalance);
+      if (isSupabaseCampaign) setDisplayBalance(nextBalance);
     }
 
     if (proofResponse.ok) {
@@ -343,36 +304,27 @@ export default function CampaignSingle(props) {
       setError("");
       const amountWei = web3.utils.toWei(data.value, "ether");
       const accounts = await web3.eth.getAccounts().catch(() => []);
-      const donorAddress =
-        accounts[0] || `dev-donor-${Date.now().toString(36)}`;
-
-      if (devMode || isSupabaseCampaign) {
-        await saveDonation({
-          amountWei,
-          donorAddress,
-          donorName: data.donorName,
-          message: data.message,
-          transactionHash: "dev-mode",
-          source: "dev",
-        });
-      } else {
-        const campaign = Campaign(effectiveAddress);
-        const receipt = await campaign.methods.contibute().send({
-          from: accounts[0],
-          value: amountWei,
-        });
-
-        await saveDonation({
-          amountWei,
-          donorAddress,
-          donorName: data.donorName,
-          message: data.message,
-          transactionHash: receipt.transactionHash,
-          source: "blockchain",
-        });
-
-        router.replace(`/campaign/${id}`);
+      const donorAddress = accounts[0];
+      if (!donorAddress) {
+        throw new Error("Connect your wallet to donate.");
       }
+
+      const campaign = Campaign(effectiveAddress);
+      const receipt = await campaign.methods.contibute().send({
+        from: donorAddress,
+        value: amountWei,
+      });
+
+      await saveDonation({
+        amountWei,
+        donorAddress,
+        donorName: data.donorName,
+        message: data.message,
+        transactionHash: receipt.transactionHash,
+        source: "blockchain",
+      });
+
+      router.replace(`/campaign/${id}`);
 
       donationForm.reset();
       setAmountInUSD(null);
@@ -458,7 +410,7 @@ export default function CampaignSingle(props) {
         <Container maxW="7xl" py={{ base: 8, md: 12 }} mt={{ base: "80px", md: "80px" }}>
           <Text fontSize="lg" color="teal.500" mb={5}>
             <ArrowBackIcon mr={2} />
-            <NextLink href="/">Back to Home</NextLink>
+            <NextLink href="/"><a>Back to Home</a></NextLink>
           </Text>
 
           {loadError ? (
@@ -495,7 +447,6 @@ export default function CampaignSingle(props) {
                     {name}
                   </Heading>
                   {isSupabaseCampaign ? <Badge colorScheme="teal">Supabase backed</Badge> : null}
-                  {devMode ? <Badge colorScheme="yellow">Dev mode</Badge> : null}
                 </Flex>
                 <Text color={muted} fontSize="lg" mt={4}>
                   {description}
@@ -543,7 +494,7 @@ export default function CampaignSingle(props) {
                 <Stat>
                   <StatLabel fontWeight="medium">
                     Campaign Balance
-                    <Tooltip label="Supabase-backed campaigns use recorded donations in dev mode.">
+                    <Tooltip label="Campaign balance is read from the Sepolia blockchain.">
                       <InfoIcon ml={2} />
                     </Tooltip>
                   </StatLabel>
@@ -599,7 +550,7 @@ export default function CampaignSingle(props) {
                       </Alert>
                     ) : null}
 
-                    {wallet.status === "connected" || devMode || isSupabaseCampaign ? (
+                    {wallet.status === "connected" ? (
                       <Button
                         colorScheme="teal"
                         isLoading={donationForm.formState.isSubmitting}
@@ -615,7 +566,7 @@ export default function CampaignSingle(props) {
                         </Button>
                         <Alert status="warning" rounded="md">
                           <AlertIcon />
-                          <AlertDescription>Connect a wallet or enable dev mode to donate.</AlertDescription>
+                          <AlertDescription>Connect a wallet to donate.</AlertDescription>
                         </Alert>
                       </Stack>
                     )}
@@ -672,7 +623,7 @@ export default function CampaignSingle(props) {
                 </form>
               </Box>
 
-              <CampaignAssistant campaignAddress={effectiveAddress} />
+             
 
               <Box bg={panelBg} borderWidth="1px" rounded="lg" p={5}>
                 <Flex justify="space-between" align="center" gap={3} wrap="wrap">

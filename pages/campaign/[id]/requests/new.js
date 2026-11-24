@@ -100,7 +100,7 @@ export default function NewRequest() {
           <Text fontSize={"lg"} color={"teal.400"} justifyContent="center">
             <ArrowBackIcon mr={2} />
             <NextLink href={`/campaign/${id}/requests`}>
-              Back to Requests
+              <a>Back to Requests</a>
             </NextLink>
           </Text>
           <Stack>

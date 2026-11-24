@@ -17,8 +17,10 @@ import {
   useToast,
 } from "@chakra-ui/react";
 import { useWallet } from "use-wallet";
+import { useAuth } from "../lib/authContext";
 
 import NextLink from "next/link";
+import { useRouter } from "next/router";
 // import DarkModeSwitch from "./DarkModeSwitch";
 import { ChevronDownIcon, HamburgerIcon } from "@chakra-ui/icons";
 import chainConfig, { isBlockchainConfigured } from "../lib/blockchainConfig";
@@ -31,6 +33,8 @@ import {
 
 export default function NavBar() {
   const wallet = useWallet();
+  const auth = useAuth();
+  const router = useRouter();
   const toast = useToast();
   const connectedToWrongNetwork =
     wallet.status === "connected" &&
@@ -63,6 +67,11 @@ export default function NavBar() {
         isClosable: true,
       });
     }
+  };
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.push("/");
   };
 
   const walletMenuLabel = connectedToWrongNetwork
@@ -104,7 +113,7 @@ export default function NavBar() {
               size="lg"
             >
               <Box>
-                <NextLink href="/">BetterFund</NextLink>
+                <NextLink href="/"><a>BetterFund</a></NextLink>
               </Box>
             </Heading>
           </Flex>
@@ -137,8 +146,59 @@ export default function NavBar() {
               variant={"link"}
               display={{ base: "none", md: "inline-flex" }}
             >
-              <NextLink href="/#howitworks"> How it Works</NextLink>
+              <NextLink href="/#howitworks"><a> How it Works</a></NextLink>
             </Button>
+
+            {auth.profile ? (
+              <NextLink href={auth.profile.role === "admin" ? "/admin" : "/creator"} passHref>
+                <Button
+                  as="a"
+                  fontSize={"md"}
+                  fontWeight={600}
+                  variant={"link"}
+                  display={{ base: "none", md: "inline-flex" }}
+                >
+                  Dashboard
+                </Button>
+              </NextLink>
+            ) : (
+              <>
+                <NextLink href="/login" passHref>
+                  <Button
+                    as="a"
+                    fontSize={"md"}
+                    fontWeight={600}
+                    variant={"link"}
+                    display={{ base: "none", md: "inline-flex" }}
+                  >
+                    Login
+                  </Button>
+                </NextLink>
+                <NextLink href="/signup" passHref>
+                  <Button
+                    as="a"
+                    fontSize={"md"}
+                    fontWeight={600}
+                    variant={"link"}
+                    display={{ base: "none", md: "inline-flex" }}
+                  >
+                    Sign up
+                  </Button>
+                </NextLink>
+              </>
+            )}
+
+            {auth.profile ? (
+              <Button
+                fontSize={"md"}
+                fontWeight={600}
+                variant={"link"}
+                display={{ base: "none", md: "inline-flex" }}
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            ) : null}
 
             {wallet.status === "connected" ? (
               <Menu>

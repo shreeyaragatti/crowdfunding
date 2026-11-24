@@ -1,6 +1,7 @@
 import fs from "fs";
 import formidable from "formidable";
 import supabaseAdmin from "../../lib/supabaseAdmin";
+import { requireCreator } from "../../lib/authServer";
 
 export const config = {
   api: {
@@ -53,6 +54,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    const context = await requireCreator(req);
+    if (context.error) {
+      res.status(context.status).json({ error: context.error });
+      return;
+    }
     const { fields, files } = await parseForm(req);
     const image = getSingleValue(files.image);
 

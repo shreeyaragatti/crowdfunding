@@ -15,32 +15,22 @@ import {
   Box,
   Divider,
   Skeleton,
-  Img,
   Icon,
-  chakra,
-  Tooltip,
   Link,
-  SkeletonCircle,
   HStack,
   Stack,
-  Progress,
   Alert,
   AlertIcon,
   AlertDescription,
-  Switch,
-  FormControl,
-  FormLabel,
 } from "@chakra-ui/react";
 
 import factory from "../smart-contract/factory";
 import web3 from "../smart-contract/web3";
 import Campaign from "../smart-contract/campaign";
 import { ExternalLinkIcon } from "@chakra-ui/icons";
-import { FaHandshake } from "react-icons/fa";
 import { FcShare, FcDonate, FcMoneyTransfer } from "react-icons/fc";
 import { isBlockchainConfigured } from "../lib/blockchainConfig";
 import ProjectSetupStatus from "../components/ProjectSetupStatus";
-import { useDevMode } from "../lib/devModeContext";
 import AIRecommendationPanel from "../components/AIRecommendationPanel";
 import CampaignCard from "../components/CampaignCard";
 
@@ -101,7 +91,6 @@ function CampaignCardWrapper({
   balance,
   target,
   ethPrice,
-  isDevMode = false,
   proofCount = 0,
   donorCount = 0,
 }) {
@@ -115,7 +104,6 @@ function CampaignCardWrapper({
       balance={balance}
       target={target}
       ethPrice={ethPrice}
-      isDevMode={isDevMode}
       proofCount={proofCount}
       donorCount={donorCount}
     />
@@ -124,34 +112,18 @@ function CampaignCardWrapper({
 
 export default function Home({ campaigns, loadError }) {
   const [campaignList, setCampaignList] = useState([]);
-  const [devCampaigns, setDevCampaigns] = useState([]);
   const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(true);
   const [campaignError, setCampaignError] = useState(loadError || "");
   const [ethPrice, updateEthPrice] = useState(null);
-  const { devMode, toggleDevMode, isLoading: isDevModeLoading } = useDevMode();
   
   // Move all hooks to top level to ensure consistent order
   const headingTextAlign = useBreakpointValue({ base: "left" });
   const headingColor = useColorModeValue("gray.800", "white");
-  const devModeBg = useColorModeValue("gray.50", "gray.700");
-  const devModeTextColor = useColorModeValue("gray.600", "gray.300");
   const emptyStateBg = useColorModeValue("gray.600", "gray.300");
 
   async function getEthMarketPrice() {
     const ETHPrice = await getETHPrice();
     updateEthPrice(ETHPrice);
-  }
-
-  async function fetchDevCampaigns() {
-    try {
-      const response = await fetch("/api/campaign-metadata");
-      if (response.ok) {
-        const data = await response.json();
-        setDevCampaigns(data.campaigns || []);
-      }
-    } catch (err) {
-      console.log("Could not fetch dev campaigns:", err.message);
-    }
   }
 
   async function getSummary() {
@@ -176,7 +148,6 @@ export default function Home({ campaigns, loadError }) {
 
   useEffect(() => {
     getEthMarketPrice();
-    fetchDevCampaigns();
 
     if (campaigns.length > 0) {
       getSummary();
@@ -214,42 +185,8 @@ export default function Home({ campaigns, loadError }) {
                 Discover and support campaigns with proof-backed transparency, trusted donor guidance, and a simple way to launch your own fundraiser.
               </Text>
 
-              <HStack spacing={4} mt={8} wrap="wrap">
-                <NextLink href="/campaign/new" passHref>
-                  <Button as="a" colorScheme="teal" size="lg">
-                    Create Campaign
-                  </Button>
-                </NextLink>
-                <NextLink href="/recommendations" passHref>
-                  <Button as="a" variant="outline" size="lg">
-                    Browse Recommendations
-                  </Button>
-                </NextLink>
-              </HStack>
+              
             </Box>
-
-            {!isDevModeLoading && (
-              <Box p={6} bg={devModeBg} rounded="3xl" borderWidth="1px">
-                <Flex direction={{ base: "column", md: "row" }} justify="space-between" align={{ base: "flex-start", md: "center" }}>
-                  <Box>
-                    <Text fontSize="sm" color={devModeTextColor}>
-                      Development mode is enabled. You can create campaigns and save proof updates without using blockchain transactions.
-                    </Text>
-                  </Box>
-                  <FormControl display="flex" alignItems="center" mt={{ base: 4, md: 0 }}>
-                    <FormLabel mb={0} fontWeight="600">
-                      Dev mode
-                    </FormLabel>
-                    <Switch
-                      isChecked={devMode}
-                      onChange={(e) => toggleDevMode(e.target.checked)}
-                      ml={4}
-                      colorScheme="teal"
-                    />
-                  </FormControl>
-                </Flex>
-              </Box>
-            )}
           </Stack>
         </Container>
         <Container py={{ base: "4", md: "6" }} maxW={"7xl"}>
@@ -257,7 +194,6 @@ export default function Home({ campaigns, loadError }) {
         </Container>
         <Container py={{ base: "4", md: "12" }} maxW={"7xl"}>
           <HStack spacing={2}>
-            {/* <SkeletonCircle size="4" /> */}
             <Heading as="h2" size="lg">
               Open Campaigns
             </Heading>
@@ -278,12 +214,11 @@ export default function Home({ campaigns, loadError }) {
               <Skeleton height="25rem" />
               <Skeleton height="25rem" />
             </SimpleGrid>
-          ) : campaignList.length > 0 || devCampaigns.length > 0 ? (
+          ) : campaignList.length > 0 ? (
             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={10} py={8}>
-              {/* Blockchain Campaigns */}
               {campaignList.map((el, i) => {
                 return (
-                  <div key={`blockchain-${i}`}>
+                  <div key={`campaign-${i}`}>
                     <CampaignCardWrapper
                       name={el[5]}
                       description={el[6]}
@@ -293,27 +228,6 @@ export default function Home({ campaigns, loadError }) {
                       target={el[8]}
                       balance={el[1]}
                       ethPrice={ethPrice}
-                      isDevMode={false}
-                    />
-                  </div>
-                );
-              })}
-              {/* Dev Mode Campaigns */}
-              {devCampaigns.map((campaign, i) => {
-                // Use campaign ID for dev campaigns, contract address for blockchain campaigns
-                const campaignPath = campaign.id || campaign.contractAddress;
-                return (
-                  <div key={`devmode-${i}`}>
-                    <CampaignCardWrapper
-                      id={campaignPath}
-                      name={campaign.name}
-                      description={campaign.description}
-                      creatorId={campaign.creatorAddress?.slice(0, 8)}
-                      imageURL={campaign.imageUrl}
-                      balance="0"
-                      target={campaign.targetWei}
-                      ethPrice={ethPrice}
-                      isDevMode={true}
                     />
                   </div>
                 );
@@ -337,7 +251,6 @@ export default function Home({ campaigns, loadError }) {
         </Container>
         <Container py={{ base: "4", md: "12" }} maxW={"7xl"} id="howitworks">
           <HStack spacing={2}>
-            {/* <SkeletonCircle size="4" /> */}
             <Heading as="h2" size="lg">
               How BetterFund Works
             </Heading>

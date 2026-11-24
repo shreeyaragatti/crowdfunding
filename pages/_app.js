@@ -5,7 +5,7 @@ import NavBar from "../components/Navbar";
 import Footer from "../components/Footer";
 import WalletAutoConnect from "../components/WalletAutoConnect";
 import FloatingChatWidget from "../components/FloatingChatWidget";
-import { DevModeProvider } from "../lib/devModeContext";
+import { AuthProvider } from "../lib/authContext";
 import "@fontsource/space-grotesk";
 import chainConfig from "../lib/blockchainConfig";
 
@@ -29,13 +29,13 @@ function MyApp({ Component, pageProps }) {
             },
           }}
         >
-          <DevModeProvider>
+          <AuthProvider>
             <WalletAutoConnect />
             <NavBar />
             <Component {...pageProps} />
             <Footer />
             <FloatingChatWidget />
-          </DevModeProvider>
+          </AuthProvider>
         </UseWalletProvider>
       </ChakraProvider>
     </>

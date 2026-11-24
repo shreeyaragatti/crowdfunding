@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import Head from "next/head";
 import { useAsync } from "react-use";
 import { useRouter } from "next/router";
-import { useWallet } from "use-wallet";
 import { useForm } from "react-hook-form";
 import {
   Flex,
@@ -29,32 +28,25 @@ import {
 import NextLink from "next/link";
 import { ArrowBackIcon } from "@chakra-ui/icons";
 import { getETHPrice, getETHPriceInUSD } from "../../lib/getETHPrice";
+import { authFetch } from "../../lib/authContext";
+import RequireAuth from "../../components/RequireAuth";
 
-import factory from "../../smart-contract/factory";
-import web3 from "../../smart-contract/web3";
-import { isBlockchainConfigured } from "../../lib/blockchainConfig";
-import { connectInjectedWallet } from "../../lib/wallet";
-import { useDevMode } from "../../lib/devModeContext";
-
-export default function NewCampaign() {
+function NewCampaignForm() {
   const {
     handleSubmit,
     register,
     formState: { isSubmitting, errors },
-  } = useForm({
-    mode: "onChange",
-  });
+  } = useForm({ mode: "onChange" });
   const imageFileField = register("imageFile");
   const router = useRouter();
   const [error, setError] = useState("");
-  const wallet = useWallet();
   const toast = useToast();
   const [minContriInUSD, setMinContriInUSD] = useState();
   const [targetInUSD, setTargetInUSD] = useState();
   const [ETHPrice, setETHPrice] = useState(0);
   const [imagePreview, setImagePreview] = useState("");
   const [selectedImageName, setSelectedImageName] = useState("");
-  const { devMode } = useDevMode();
+
   useAsync(async () => {
     try {
       const result = await getETHPrice();
@@ -63,20 +55,19 @@ export default function NewCampaign() {
       console.log(error);
     }
   }, []);
-  const uploadCampaignImage = async (file, creator) => {
+
+  const uploadCampaignImage = async (file) => {
     const formData = new FormData();
     formData.append("image", file);
-    formData.append("creator", creator);
 
     try {
-      const response = await fetch("/api/campaign-image", {
+      const response = await authFetch("/api/campaign-image", {
         method: "POST",
         body: formData,
       });
       const result = await response.json();
 
       if (!response.ok) {
-        console.warn("Image upload failed:", result.error);
         throw new Error(result.error || "Campaign image upload failed.");
       }
 
@@ -88,27 +79,14 @@ export default function NewCampaign() {
   };
 
   async function onSubmit(data) {
-    console.log(
-      data.minimumContribution,
-      data.campaignName,
-      data.description,
-      data.target
-    );
     try {
-      if (!devMode && (!isBlockchainConfigured || !factory)) {
-        throw new Error(
-          "Blockchain settings are not complete. Add RPC and factory contract values to .env or .env.local."
-        );
-      }
+      setError("");
 
-      const accounts = await web3.eth.getAccounts().catch(() => []);
       const imageFile = data.imageFile && data.imageFile[0];
-      
-      // Try to upload image file, or use provided URL
       let imageUrl = null;
       if (imageFile) {
         try {
-          imageUrl = await uploadCampaignImage(imageFile, accounts[0] || "anonymous");
+          imageUrl = await uploadCampaignImage(imageFile);
         } catch (err) {
           setError(`Image upload failed: ${err.message}`);
           throw err;
@@ -117,199 +95,107 @@ export default function NewCampaign() {
         imageUrl = data.imageUrl;
       }
 
-      // Image is required
       if (!imageUrl) {
         setError("Please upload an image or provide an image URL.");
         throw new Error("Upload a campaign image or paste an image URL.");
       }
 
-      const minimumContributionWei = web3.utils.toWei(
-        data.minimumContribution,
-        "ether"
-      );
-      const targetWei = web3.utils.toWei(data.target, "ether");
+      const minimumContributionWei = data.minimumContribution
+        ? String(Number(data.minimumContribution) * 1e18)
+        : "0";
+      const targetWei = data.target ? String(Number(data.target) * 1e18) : "0";
 
-      // Generate a consistent dev mode address based on campaign name
-      const devModeAddress = `0xdev${Math.random().toString(16).slice(2, 10)}`;
-      const creatorAddress = accounts[0] || devModeAddress;
-
-      // In dev mode, skip the actual blockchain transaction
-      if (devMode) {
-        // Log the campaign creation details instead of sending to blockchain
-        console.log("DEV MODE: Campaign creation skipped (no blockchain transaction)");
-        console.log({
-          minimumContribution: minimumContributionWei,
-          campaignName: data.campaignName,
+      const response = await authFetch("/api/creator/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.campaignName,
           description: data.description,
           imageUrl,
-          target: targetWei,
-          creator: creatorAddress,
-        });
+          minimumContributionWei,
+          targetWei,
+          category: data.category || "general",
+          beneficiaryType: data.beneficiaryType || "general",
+          beneficiaryCount: parseInt(data.beneficiaryCount) || 1,
+          location: data.location || null,
+          urgencyLevel: data.urgencyLevel || "normal",
+        }),
+      });
 
-        // Save metadata to database
-        const metadataResponse = await fetch("/api/campaign-metadata", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contractAddress: null,
-            creatorAddress,
-            name: data.campaignName,
-            description: data.description,
-            imageUrl,
-            minimumContributionWei,
-            targetWei,
-            transactionHash: "0xDEVMODE",
-            devMode: true,
-            category: data.category || "other",
-            beneficiaryType: data.beneficiaryType || "general",
-            beneficiaryCount: parseInt(data.beneficiaryCount) || 1,
-            location: data.location || null,
-            urgencyLevel: data.urgencyLevel || "normal",
-          }),
-        });
-
-        if (!metadataResponse.ok) {
-          const error = await metadataResponse.json();
-          throw new Error(error.error || "Failed to save campaign metadata");
-        }
-
-        const campaignData = await metadataResponse.json();
-        const campaignId = campaignData.campaign?.id;
-
-        toast({
-          title: "Campaign created",
-          description: "Campaign created and saved with image. No blockchain transaction sent.",
-          status: "success",
-          duration: 5000,
-          isClosable: true,
-        });
-
-        router.push(campaignId ? `/campaign/${campaignId}` : "/");
-      } else {
-        // Normal production flow with blockchain
-        const receipt = await factory.methods
-          .createCampaign(
-            minimumContributionWei,
-            data.campaignName,
-            data.description,
-            imageUrl,
-            targetWei
-          )
-          .send({
-            from: creatorAddress,
-          });
-
-        const contractAddress =
-          receipt.events &&
-          receipt.events.CampaignCreated &&
-          receipt.events.CampaignCreated.returnValues &&
-          receipt.events.CampaignCreated.returnValues.campaign;
-
-        await fetch("/api/campaign-metadata", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contractAddress,
-            creatorAddress,
-            name: data.campaignName,
-            description: data.description,
-            imageUrl,
-            minimumContributionWei,
-            targetWei,
-            transactionHash: receipt.transactionHash,
-            category: data.category || "other",
-            beneficiaryType: data.beneficiaryType || "general",
-            beneficiaryCount: parseInt(data.beneficiaryCount) || 1,
-            location: data.location || null,
-            urgencyLevel: data.urgencyLevel || "normal",
-          }),
-        });
-
-        router.push("/");
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Campaign draft could not be saved.");
       }
+
+      toast({
+        title: "Campaign draft saved",
+        description:
+          "Your campaign is now a draft. Upload verification documents and submit it for admin review. No Sepolia transaction has been sent yet.",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
+
+      router.push(`/creator/campaigns/${result.campaign.id}`);
     } catch (err) {
       setError(err.message);
       console.log(err);
     }
   }
 
-  const handleConnectWallet = async () => {
-    try {
-      await connectInjectedWallet(wallet);
-    } catch (error) {
-      toast({
-        title: "Wallet connection failed",
-        description: error.message,
-        status: "error",
-        duration: 6000,
-        isClosable: true,
-      });
-    }
-  };
+  const panelBg = useColorModeValue("white", "gray.700");
 
   return (
     <div>
       <Head>
-        <title>New Campaign</title>
-        <meta name="description" content="Create New Campaign" />
+        <title>New Campaign Draft</title>
+        <meta name="description" content="Create a new campaign draft" />
         <link rel="icon" href="/logo.svg" />
       </Head>
       <main>
         <Stack spacing={8} mx={"auto"} maxW={"2xl"} py={12} px={6} mt={{ base: "80px", md: "80px" }}>
           <Text fontSize={"lg"} color={"teal.400"}>
             <ArrowBackIcon mr={2} />
-            <NextLink href="/"> Back to Home</NextLink>
+            <NextLink href="/creator"><a> Back to dashboard</a></NextLink>
           </Text>
           <Stack>
-            <Heading fontSize={"4xl"}>Create a New Campaign</Heading>
+            <Heading fontSize={"4xl"}>Create a Campaign Draft</Heading>
+            <Text color={useColorModeValue("gray.600", "gray.300")}>
+              Drafts are free. Your campaign is reviewed by an admin before any Sepolia transaction is required.
+            </Text>
           </Stack>
-          <Box
-            rounded={"lg"}
-            bg={useColorModeValue("white", "gray.700")}
-            boxShadow={"lg"}
-            p={8}
-          >
+          <Alert status="info" rounded="md">
+            <AlertIcon />
+            <AlertDescription>
+              No blockchain transaction is sent now. Sepolia gas is only used after admin approval, when you publish the campaign.
+            </AlertDescription>
+          </Alert>
+          <Box rounded={"lg"} bg={panelBg} boxShadow={"lg"} p={8}>
             <form onSubmit={handleSubmit(onSubmit)}>
               <Stack spacing={4}>
                 <FormControl id="minimumContribution">
                   <FormLabel>Minimum Contribution Amount</FormLabel>
                   <InputGroup>
-                    {" "}
                     <Input
                       type="number"
                       step="any"
                       {...register("minimumContribution", { required: true })}
                       isDisabled={isSubmitting}
-                      onChange={(e) => {
-                        setMinContriInUSD(Math.abs(e.target.value));
-                      }}
-                    />{" "}
+                      onChange={(e) => setMinContriInUSD(Math.abs(e.target.value))}
+                    />
                     <InputRightAddon children="ETH" />
                   </InputGroup>
                   {minContriInUSD ? (
-                    <FormHelperText>
-                      ~$ {getETHPriceInUSD(ETHPrice, minContriInUSD)}
-                    </FormHelperText>
+                    <FormHelperText>~$ {getETHPriceInUSD(ETHPrice, minContriInUSD)}</FormHelperText>
                   ) : null}
                 </FormControl>
                 <FormControl id="campaignName">
                   <FormLabel>Campaign Name</FormLabel>
-                  <Input
-                    {...register("campaignName", { required: true })}
-                    isDisabled={isSubmitting}
-                  />
+                  <Input {...register("campaignName", { required: true })} isDisabled={isSubmitting} />
                 </FormControl>
                 <FormControl id="category">
                   <FormLabel>Campaign Category</FormLabel>
-                  <Select
-                    {...register("category")}
-                    isDisabled={isSubmitting}
-                    placeholder="Select a category (optional)"
-                  >
+                  <Select {...register("category")} isDisabled={isSubmitting} placeholder="Select a category (optional)">
                     <option value="education">Education</option>
                     <option value="medical">Medical Support</option>
                     <option value="emergency">Emergency Relief</option>
@@ -317,17 +203,10 @@ export default function NewCampaign() {
                     <option value="disaster">Disaster Relief</option>
                     <option value="other">Other</option>
                   </Select>
-                  <FormHelperText>
-                    Help donors find campaigns by cause
-                  </FormHelperText>
                 </FormControl>
                 <FormControl id="beneficiaryType">
-                  <FormLabel>Who will benefit? (Beneficiary Type)</FormLabel>
-                  <Select
-                    {...register("beneficiaryType")}
-                    isDisabled={isSubmitting}
-                    placeholder="Select beneficiary type (optional)"
-                  >
+                  <FormLabel>Who will benefit?</FormLabel>
+                  <Select {...register("beneficiaryType")} isDisabled={isSubmitting} placeholder="Select beneficiary type (optional)">
                     <option value="students">Students</option>
                     <option value="elders">Elders</option>
                     <option value="children">Children</option>
@@ -336,55 +215,26 @@ export default function NewCampaign() {
                     <option value="underprivileged">Underprivileged</option>
                     <option value="community">Community</option>
                   </Select>
-                  <FormHelperText>
-                    The primary group that will benefit from this campaign
-                  </FormHelperText>
                 </FormControl>
                 <FormControl id="beneficiaryCount">
                   <FormLabel>Estimated Number of Beneficiaries</FormLabel>
-                  <Input
-                    type="number"
-                    min="1"
-                    {...register("beneficiaryCount")}
-                    isDisabled={isSubmitting}
-                    placeholder="e.g., 50 students, 100 families"
-                  />
-                  <FormHelperText>
-                    How many people will this campaign help?
-                  </FormHelperText>
+                  <Input type="number" min="1" {...register("beneficiaryCount")} isDisabled={isSubmitting} placeholder="e.g., 50" />
                 </FormControl>
                 <FormControl id="location">
                   <FormLabel>Location/Region</FormLabel>
-                  <Input
-                    {...register("location")}
-                    isDisabled={isSubmitting}
-                    placeholder="e.g., Kerala, Mumbai, or Country"
-                  />
-                  <FormHelperText>
-                    Where is this campaign focused? (optional)
-                  </FormHelperText>
+                  <Input {...register("location")} isDisabled={isSubmitting} placeholder="e.g., Kerala, Mumbai" />
                 </FormControl>
                 <FormControl id="urgencyLevel">
                   <FormLabel>Urgency Level</FormLabel>
-                  <Select
-                    {...register("urgencyLevel")}
-                    isDisabled={isSubmitting}
-                    placeholder="Select urgency level (optional)"
-                  >
+                  <Select {...register("urgencyLevel")} isDisabled={isSubmitting} placeholder="Select urgency level (optional)">
                     <option value="normal">Normal</option>
                     <option value="urgent">Urgent</option>
                     <option value="emergency">Emergency</option>
                   </Select>
-                  <FormHelperText>
-                    How urgent is this campaign?
-                  </FormHelperText>
                 </FormControl>
                 <FormControl id="description">
                   <FormLabel>Campaign Description</FormLabel>
-                  <Textarea
-                    {...register("description", { required: true })}
-                    isDisabled={isSubmitting}
-                  />
+                  <Textarea {...register("description", { required: true })} isDisabled={isSubmitting} />
                 </FormControl>
                 <FormControl id="imageUrl">
                   <FormLabel>Campaign Image *</FormLabel>
@@ -403,29 +253,12 @@ export default function NewCampaign() {
                       setImagePreview(file ? URL.createObjectURL(file) : "");
                     }}
                   />
-                  {selectedImageName ? (
-                    <FormHelperText>{selectedImageName}</FormHelperText>
-                  ) : null}
+                  {selectedImageName ? <FormHelperText>{selectedImageName}</FormHelperText> : null}
                   {imagePreview ? (
-                    <Image
-                      src={imagePreview}
-                      alt="Selected campaign image preview"
-                      mt={3}
-                      rounded="md"
-                      maxH="220px"
-                      objectFit="cover"
-                    />
+                    <Image src={imagePreview} alt="Selected campaign image preview" mt={3} rounded="md" maxH="220px" objectFit="cover" />
                   ) : null}
-                  <FormHelperText>
-                    Upload an image, or paste an image URL below (at least one required)
-                  </FormHelperText>
-                  <Input
-                    {...register("imageUrl")}
-                    isDisabled={isSubmitting}
-                    type="url"
-                    mt={2}
-                    placeholder="Or paste an image URL..."
-                  />
+                  <FormHelperText>Upload an image, or paste an image URL below (at least one required)</FormHelperText>
+                  <Input {...register("imageUrl")} isDisabled={isSubmitting} type="url" mt={2} placeholder="Or paste an image URL..." />
                 </FormControl>
                 <FormControl id="target">
                   <FormLabel>Target Amount</FormLabel>
@@ -435,79 +268,29 @@ export default function NewCampaign() {
                       step="any"
                       {...register("target", { required: true })}
                       isDisabled={isSubmitting}
-                      onChange={(e) => {
-                        setTargetInUSD(Math.abs(e.target.value));
-                      }}
+                      onChange={(e) => setTargetInUSD(Math.abs(e.target.value))}
                     />
                     <InputRightAddon children="ETH" />
                   </InputGroup>
-                  {targetInUSD ? (
-                    <FormHelperText>
-                      ~$ {getETHPriceInUSD(ETHPrice, targetInUSD)}
-                    </FormHelperText>
-                  ) : null}
+                  {targetInUSD ? <FormHelperText>~$ {getETHPriceInUSD(ETHPrice, targetInUSD)}</FormHelperText> : null}
                 </FormControl>
 
                 {error ? (
                   <Alert status="error">
                     <AlertIcon />
-                    <AlertDescription mr={2}> {error}</AlertDescription>
+                    <AlertDescription mr={2}>{error}</AlertDescription>
                   </Alert>
                 ) : null}
-                {errors.minimumContribution ||
-                errors.campaignName ||
-                errors.description ||
-                errors.target ? (
+                {errors.minimumContribution || errors.campaignName || errors.description || errors.target ? (
                   <Alert status="error">
                     <AlertIcon />
-                    <AlertDescription mr={2}>
-                      Campaign name, description, minimum contribution, and
-                      target are required
-                    </AlertDescription>
+                    <AlertDescription mr={2}>Campaign name, description, minimum contribution, and target are required</AlertDescription>
                   </Alert>
                 ) : null}
-                {devMode && (
-                  <Alert status="info" rounded="md">
-                    <AlertIcon />
-                    <AlertDescription mr={2}>
-                      Dev mode active: this campaign will be saved to Supabase without blockchain verification.
-                    </AlertDescription>
-                  </Alert>
-                )}
                 <Stack spacing={10}>
-                  {wallet.status === "connected" || devMode ? (
-                    <Button
-                      bg={"teal.400"}
-                      color={"white"}
-                      _hover={{
-                        bg: "teal.500",
-                      }}
-                      isLoading={isSubmitting}
-                      type="submit"
-                    >
-                      Create
-                    </Button>
-                  ) : (
-                    <Stack spacing={3}>
-                      <Button
-                        type="button"
-                        color={"white"}
-                        bg={"teal.400"}
-                        _hover={{
-                          bg: "teal.300",
-                        }}
-                        onClick={handleConnectWallet}
-                      >
-                        Connect Wallet{" "}
-                      </Button>
-                      <Alert status="warning">
-                        <AlertIcon />
-                        <AlertDescription mr={2}>
-                          Please Connect Your Wallet First to Create a Campaign
-                        </AlertDescription>
-                      </Alert>
-                    </Stack>
-                  )}
+                  <Button bg={"teal.400"} color={"white"} _hover={{ bg: "teal.500" }} isLoading={isSubmitting} type="submit">
+                    Save draft
+                  </Button>
                 </Stack>
               </Stack>
             </form>
@@ -515,5 +298,13 @@ export default function NewCampaign() {
         </Stack>
       </main>
     </div>
+  );
+}
+
+export default function NewCampaign() {
+  return (
+    <RequireAuth role="creator">
+      <NewCampaignForm />
+    </RequireAuth>
   );
 }

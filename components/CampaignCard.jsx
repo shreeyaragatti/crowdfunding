@@ -26,14 +26,11 @@ export default function CampaignCard({
   balance,
   target,
   ethPrice,
-  isDevMode,
   proofCount,
   donorCount,
 }) {
   const bgColor = useColorModeValue("white", "gray.800");
-  const badgeBg = isDevMode ? "yellow.400" : "teal.400";
-  const badgeText = isDevMode ? "black" : "white";
-  const progressColor = isDevMode ? "yellow" : "teal";
+  const progressColor = "teal";
   const hoverShadow = useColorModeValue(
     "0px 12px 24px rgba(0, 0, 0, 0.15)",
     "0px 12px 24px rgba(0, 0, 0, 0.5)"
@@ -81,15 +78,15 @@ export default function CampaignCard({
             position="absolute"
             top={3}
             right={3}
-            bg={badgeBg}
-            color={badgeText}
+            bg="teal.400"
+            color="white"
             px={3}
             py={1}
             rounded="md"
             fontSize="xs"
             fontWeight="bold"
           >
-            {isDevMode ? "🔧 Dev Mode" : "📱 Live"}
+            📱 Live
           </Badge>
 
           {/* Proof indicator */}

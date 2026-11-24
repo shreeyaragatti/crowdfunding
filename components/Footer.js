@@ -76,11 +76,11 @@ export default function Footer() {
               zIndex: -1,
             }}
           >
-            <NextLink href="/">BetterFund</NextLink>
+            <NextLink href="/"><a>BetterFund</a></NextLink>
           </Box>
         </Heading>
         <Stack direction={"row"} spacing={6}>
-          <NextLink href="/">Home</NextLink>
+          <NextLink href="/"><a>Home</a></NextLink>
           
           <Link href={"mailto:shreeyaragatti24@gmail.com"} isExternal>
             Contact

@@ -245,7 +245,6 @@ export default function AIRecommendationPanel({ initialInterest = "", simpleQuic
                   balance={campaign.balance || campaign.targetWei || "0"}
                   target={campaign.targetWei || campaign.target_wei || "0"}
                   ethPrice={0}
-                  isDevMode={!campaign.contractAddress}
                   proofCount={campaign.proofCount || 0}
                   donorCount={campaign.donorCount || 0}
                 />

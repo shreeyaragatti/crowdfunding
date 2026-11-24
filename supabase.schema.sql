@@ -129,3 +129,123 @@ create policy "Campaign proofs are publicly readable"
   for select
   to anon, authenticated
   using (true);
+-- RBAC, campaign workflow, and verification documents (added)
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text not null unique,
+  full_name text,
+  role text not null default 'creator' check (role in ('creator', 'admin')),
+  wallet_address text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.profiles enable row level security;
+revoke all on public.profiles from anon, authenticated;
+grant select on public.profiles to authenticated;
+
+drop policy if exists "Users can read their own profile" on public.profiles;
+create policy "Users can read their own profile"
+  on public.profiles
+  for select
+  to authenticated
+  using (auth.uid() = id);
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, full_name)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data ->> 'full_name', '')
+  )
+  on conflict (id) do update
+    set email = excluded.email,
+        full_name = coalesce(nullif(excluded.full_name, ''), public.profiles.full_name),
+        updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+alter table public.campaign_metadata
+  add column if not exists creator_id uuid references public.profiles(id) on delete set null,
+  add column if not exists review_notes text,
+  add column if not exists rejection_reason text,
+  add column if not exists reviewed_by uuid references public.profiles(id) on delete set null,
+  add column if not exists reviewed_at timestamptz,
+  add column if not exists submitted_at timestamptz,
+  add column if not exists published_at timestamptz;
+
+alter table public.campaign_metadata alter column creator_address drop not null;
+
+update public.campaign_metadata set status = 'published' where status = 'deployed';
+update public.campaign_metadata set status = 'draft' where status = 'created';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'campaign_metadata_status_check'
+  ) then
+    alter table public.campaign_metadata
+      add constraint campaign_metadata_status_check
+      check (status in ('draft', 'pending_review', 'needs_info', 'approved', 'rejected', 'published'));
+  end if;
+end $$;
+
+create index if not exists campaign_metadata_creator_id_idx
+  on public.campaign_metadata (creator_id, created_at desc);
+create index if not exists campaign_metadata_status_idx
+  on public.campaign_metadata (status, created_at desc);
+
+create table if not exists public.campaign_supporting_documents (
+  id uuid primary key default gen_random_uuid(),
+  campaign_id uuid not null references public.campaign_metadata(id) on delete cascade,
+  uploader_id uuid references public.profiles(id) on delete set null,
+  document_type text not null,
+  document_name text not null,
+  document_url text,
+  document_path text not null,
+  mime_type text,
+  file_size bigint,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists campaign_supporting_documents_campaign_idx
+  on public.campaign_supporting_documents (campaign_id, created_at desc);
+
+alter table public.campaign_supporting_documents enable row level security;
+revoke all on public.campaign_supporting_documents from anon, authenticated;
+
+create table if not exists public.campaign_review_events (
+  id uuid primary key default gen_random_uuid(),
+  campaign_id uuid not null references public.campaign_metadata(id) on delete cascade,
+  actor_id uuid references public.profiles(id) on delete set null,
+  actor_role text not null check (actor_role in ('creator', 'admin', 'system')),
+  action text not null check (action in ('submitted', 'approved', 'rejected', 'info_requested', 'published')),
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists campaign_review_events_campaign_idx
+  on public.campaign_review_events (campaign_id, created_at desc);
+
+alter table public.campaign_review_events enable row level security;
+revoke all on public.campaign_review_events from anon, authenticated;
+
+drop policy if exists "Campaign metadata is publicly readable" on public.campaign_metadata;
+drop policy if exists "Published campaigns are publicly readable" on public.campaign_metadata;
+create policy "Published campaigns are publicly readable"
+  on public.campaign_metadata
+  for select
+  to anon, authenticated
+  using (status = 'published');
