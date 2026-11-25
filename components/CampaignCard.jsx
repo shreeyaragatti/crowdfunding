@@ -39,7 +39,12 @@ export default function CampaignCard({
 
   const balanceEth = web3.utils.fromWei(balance || "0", "ether");
   const targetEth = web3.utils.fromWei(target || "0", "ether");
-  const progressPercent = Math.min(100, (Number(balanceEth) / Number(targetEth)) * 100 || 0);
+  const balanceEthNumber = Number(balanceEth);
+  const targetEthNumber = Number(targetEth);
+  const progressPercent =
+    targetEthNumber > 0 && Number.isFinite(balanceEthNumber)
+      ? Math.min(100, (balanceEthNumber / targetEthNumber) * 100)
+      : 0;
   const balanceUSD = getWEIPriceInUSD(ethPrice, balance || "0");
   const targetUSD = getWEIPriceInUSD(ethPrice, target || "0");
 

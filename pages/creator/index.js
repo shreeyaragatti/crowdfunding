@@ -27,6 +27,7 @@ function CreatorDashboardContent() {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const muted = useColorModeValue("gray.600", "gray.300");
 
   useEffect(() => {
     let active = true;
@@ -98,7 +99,7 @@ function CreatorDashboardContent() {
                     <Tr key={campaign.id}>
                       <Td>
                         <Text fontWeight="semibold">{campaign.name}</Text>
-                        <Text fontSize="sm" color={useColorModeValue("gray.600", "gray.300")}>{campaign.category}</Text>
+                        <Text fontSize="sm" color={muted}>{campaign.category}</Text>
                       </Td>
                       <Td>
                         <Badge colorScheme={statusColor[campaign.status] || "gray"}>{campaign.status}</Badge>

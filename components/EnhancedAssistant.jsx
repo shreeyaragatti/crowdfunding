@@ -52,6 +52,7 @@ export default function EnhancedAssistant({ campaignAddress, isDarkMode }) {
   const userBg = useColorModeValue("blue.50", "blue.900");
   const muted = useColorModeValue("gray.600", "gray.300");
   const successColor = useColorModeValue("green.600", "green.300");
+  const conversationBg = useColorModeValue("gray.50", "gray.900");
   const isMobile = useBreakpointValue({ base: true, md: false });
 
   // Auto-scroll to latest message
@@ -165,7 +166,7 @@ export default function EnhancedAssistant({ campaignAddress, isDarkMode }) {
           <VStack
             align="stretch"
             spacing={3}
-            bg={useColorModeValue("gray.50", "gray.900")}
+            bg={conversationBg}
             p={4}
             rounded="md"
             maxH="400px"

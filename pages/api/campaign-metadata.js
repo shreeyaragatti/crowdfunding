@@ -42,15 +42,23 @@ async function handleGet(req, res) {
     if (error) throw error;
 
     if (req.query.id) {
-      res.status(200).json({ campaign: serializeCampaign(data) });
+      res.status(200).json({ campaign: serializePublicCampaign(data) });
       return;
     }
 
-    res.status(200).json({ campaigns: (data || []).map(serializeCampaign) });
+    res.status(200).json({ campaigns: (data || []).map(serializePublicCampaign) });
   } catch (error) {
     console.error("Error fetching campaign metadata:", error);
     res.status(500).json({
       error: error.message || "Could not fetch campaign metadata.",
     });
   }
+}
+
+function serializePublicCampaign(campaign) {
+  const serialized = serializeCampaign(campaign);
+  if (!serialized) return null;
+  delete serialized.reviewNotes;
+  delete serialized.rejectionReason;
+  return serialized;
 }

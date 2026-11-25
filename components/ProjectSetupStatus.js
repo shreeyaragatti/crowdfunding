@@ -30,6 +30,8 @@ const StatusItem = ({ complete, children }) => {
 };
 
 export default function ProjectSetupStatus() {
+  const alertBg = useColorModeValue("blue.50", "whiteAlpha.100");
+
   if (isBlockchainConfigured && isBackendConfigured) return null;
 
   return (
@@ -38,7 +40,7 @@ export default function ProjectSetupStatus() {
       variant="subtle"
       rounded="md"
       alignItems="start"
-      bg={useColorModeValue("blue.50", "whiteAlpha.100")}
+      bg={alertBg}
     >
       <AlertIcon mt={1} />
       <Box>

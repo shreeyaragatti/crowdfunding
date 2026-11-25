@@ -29,6 +29,7 @@ import NextLink from "next/link";
 import { ArrowBackIcon } from "@chakra-ui/icons";
 import { getETHPrice, getETHPriceInUSD } from "../../lib/getETHPrice";
 import { authFetch } from "../../lib/authContext";
+import web3 from "../../smart-contract/web3";
 import RequireAuth from "../../components/RequireAuth";
 
 function NewCampaignForm() {
@@ -100,10 +101,11 @@ function NewCampaignForm() {
         throw new Error("Upload a campaign image or paste an image URL.");
       }
 
-      const minimumContributionWei = data.minimumContribution
-        ? String(Number(data.minimumContribution) * 1e18)
-        : "0";
-      const targetWei = data.target ? String(Number(data.target) * 1e18) : "0";
+      const minimumContributionWei = web3.utils.toWei(
+        String(data.minimumContribution || "0"),
+        "ether"
+      );
+      const targetWei = web3.utils.toWei(String(data.target || "0"), "ether");
 
       const response = await authFetch("/api/creator/campaigns", {
         method: "POST",

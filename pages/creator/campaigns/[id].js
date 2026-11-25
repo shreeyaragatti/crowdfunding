@@ -70,6 +70,9 @@ function CreatorCampaignDetailContent() {
   const [publishing, setPublishing] = useState(false);
   const [connectingWallet, setConnectingWallet] = useState(false);
   const [estimate, setEstimate] = useState(null);
+  const pageBg = useColorModeValue("gray.50", "gray.900");
+  const panelBg = useColorModeValue("white", "gray.800");
+  const muted = useColorModeValue("gray.600", "gray.300");
   const [edit, setEdit] = useState({
     name: "",
     description: "",
@@ -122,6 +125,21 @@ function CreatorCampaignDetailContent() {
   const handleSave = async () => {
     setSaving(true);
     setError("");
+
+    let targetWei;
+    let minimumContributionWei;
+    try {
+      targetWei = web3.utils.toWei(String(edit.target || "0"), "ether");
+      minimumContributionWei = web3.utils.toWei(
+        String(edit.minimumContribution || "0"),
+        "ether"
+      );
+    } catch (conversionError) {
+      setSaving(false);
+      setError("Enter valid ETH amounts for the target and minimum contribution.");
+      return;
+    }
+
     const response = await authFetch(`/api/creator/campaigns/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -129,8 +147,8 @@ function CreatorCampaignDetailContent() {
         name: edit.name,
         description: edit.description,
         imageUrl: edit.imageUrl,
-        targetWei: String(Number(edit.target || "0") * 1e18),
-        minimumContributionWei: String(Number(edit.minimumContribution || "0") * 1e18),
+        targetWei,
+        minimumContributionWei,
         category: edit.category,
         beneficiaryType: edit.beneficiaryType,
         beneficiaryCount: Number(edit.beneficiaryCount) || 1,
@@ -316,7 +334,7 @@ function CreatorCampaignDetailContent() {
   const wrongNetwork = wallet.status === "connected" && Number(wallet.chainId) !== chainConfig.chainId;
 
   return (
-    <Box minH="100vh" bg={useColorModeValue("gray.50", "gray.900")}>
+    <Box minH="100vh" bg={pageBg}>
       <Head><title>{campaign.name} | Creator</title></Head>
       <Container maxW="7xl" py={{ base: 8, md: 12 }} mt={{ base: "80px", md: "80px" }}>
         <VStack spacing={6} align="stretch">
@@ -339,7 +357,7 @@ function CreatorCampaignDetailContent() {
           ) : null}
 
           <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-            <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+            <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
               <Heading size="md" mb={4}>Campaign details</Heading>
               {editable ? (
                 <Stack spacing={4}>
@@ -358,11 +376,11 @@ function CreatorCampaignDetailContent() {
                   <HStack>
                     <FormControl>
                       <FormLabel>Minimum contribution (ETH)</FormLabel>
-                      <Input type="number" step="any" value={edit.minimumContribution} onChange={(e) => setEdit({ ...edit, minimumContribution: e.target.value })} />
+                      <Input type="number" step="any" min="0" value={edit.minimumContribution} onChange={(e) => setEdit({ ...edit, minimumContribution: e.target.value })} />
                     </FormControl>
                     <FormControl>
                       <FormLabel>Target (ETH)</FormLabel>
-                      <Input type="number" step="any" value={edit.target} onChange={(e) => setEdit({ ...edit, target: e.target.value })} />
+                      <Input type="number" step="any" min="0" value={edit.target} onChange={(e) => setEdit({ ...edit, target: e.target.value })} />
                     </FormControl>
                   </HStack>
                   <HStack>
@@ -389,9 +407,9 @@ function CreatorCampaignDetailContent() {
               )}
             </Box>
 
-            <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+            <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
               <Heading size="md" mb={4}>Verification documents</Heading>
-              <Text fontSize="sm" color={useColorModeValue("gray.600", "gray.300")} mb={4}>
+              <Text fontSize="sm" color={muted} mb={4}>
                 Upload at least 2 documents, such as identity proof, photos, videos, or supporting PDFs, so an admin can verify the campaign remotely.
               </Text>
               {editable ? (
@@ -403,12 +421,12 @@ function CreatorCampaignDetailContent() {
               ) : null}
               <VStack spacing={3} align="stretch">
                 {documents.length === 0 ? (
-                  <Text color={useColorModeValue("gray.600", "gray.300")}>No documents uploaded yet.</Text>
+                  <Text color={muted}>No documents uploaded yet.</Text>
                 ) : (
                   documents.map((document) => (
                     <Box key={document.id} borderWidth="1px" rounded="md" p={3}>
                       <Text fontWeight="semibold">{document.document_name}</Text>
-                      <Text fontSize="sm" color={useColorModeValue("gray.600", "gray.300")}>
+                      <Text fontSize="sm" color={muted}>
                         {document.document_type} · {document.mime_type} · {Math.round((document.file_size || 0) / 1024)} KB
                       </Text>
                       {document.signedUrl && document.document_type === "image" ? (
@@ -427,7 +445,7 @@ function CreatorCampaignDetailContent() {
             </Box>
           </SimpleGrid>
 
-          <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+          <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
             <Heading size="md" mb={4}>Review and publication</Heading>
             <Stack spacing={4}>
               <Text>Status: <Badge colorScheme={statusColor[campaign.status] || "gray"}>{campaign.status}</Badge></Text>
@@ -479,10 +497,10 @@ function CreatorCampaignDetailContent() {
             </Stack>
           </Box>
 
-          <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+          <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
             <Heading size="md" mb={4}>Donations</Heading>
             {donations.length === 0 ? (
-              <Text color={useColorModeValue("gray.600", "gray.300")}>No donations recorded yet.</Text>
+              <Text color={muted}>No donations recorded yet.</Text>
             ) : (
               <VStack spacing={2} align="stretch">
                 {donations.map((donation) => (
@@ -495,17 +513,17 @@ function CreatorCampaignDetailContent() {
             )}
           </Box>
 
-          <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+          <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
             <Heading size="md" mb={4}>Review history</Heading>
             {reviewEvents.length === 0 ? (
-              <Text color={useColorModeValue("gray.600", "gray.300")}>No review activity yet.</Text>
+              <Text color={muted}>No review activity yet.</Text>
             ) : (
               <VStack spacing={2} align="stretch">
                 {reviewEvents.map((event) => (
                   <Box key={event.id} borderWidth="1px" rounded="md" p={3}>
                     <HStack justify="space-between">
                       <Text fontWeight="semibold">{event.action}</Text>
-                      <Text fontSize="sm" color={useColorModeValue("gray.600", "gray.300")}>{new Date(event.created_at).toLocaleString()}</Text>
+                      <Text fontSize="sm" color={muted}>{new Date(event.created_at).toLocaleString()}</Text>
                     </HStack>
                     {event.notes ? <Text fontSize="sm" mt={1}>{event.notes}</Text> : null}
                   </Box>

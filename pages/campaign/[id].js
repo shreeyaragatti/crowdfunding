@@ -116,13 +116,13 @@ export async function getServerSideProps({ params }) {
   const campaignId = params.id;
   const ETHPrice = await getETHPrice().catch(() => 0);
   const supabaseCampaign = await getSupabaseCampaign(campaignId).catch(() => null);
-  const children = await getSupabaseChildren(campaignId).catch(() => ({
-    donations: [],
-    proofs: [],
-  }));
 
   // Determine the effective campaign address for blockchain operations
   const effectiveAddress = supabaseCampaign?.contract_address || campaignId;
+  const children = await getSupabaseChildren(effectiveAddress).catch(() => ({
+    donations: [],
+    proofs: [],
+  }));
 
   if (isBlockchainConfigured && isEthereumAddress(effectiveAddress)) {
     try {
@@ -157,14 +157,14 @@ export async function getServerSideProps({ params }) {
   return {
     props: {
       id: campaignId,
-      effectiveAddress: campaignId,
+      effectiveAddress,
       ...zeroSummary,
       ETHPrice,
       loadError:
         "This campaign could not be loaded from the configured Ethereum network.",
       isSupabaseCampaign: Boolean(supabaseCampaign),
-      initialDonations: [],
-      initialProofs: [],
+      initialDonations: children.donations.map(serializeDonation),
+      initialProofs: children.proofs.map(serializeProof),
     },
   };
 }
@@ -276,7 +276,7 @@ export default function CampaignSingle(props) {
     setDonations(initialDonations || []);
     setProofs(initialProofs || []);
     setDisplayBalance(balance);
-  }, [effectiveAddress]);
+  }, [effectiveAddress, balance, initialDonations, initialProofs]);
 
   async function refreshSupabaseChildren() {
     const [donationResponse, proofResponse] = await Promise.all([
@@ -288,10 +288,6 @@ export default function CampaignSingle(props) {
 
     if (donationResponse.ok) {
       setDonations(donationData.donations || []);
-      const nextBalance = (donationData.donations || [])
-        .reduce((total, donation) => total + BigInt(donation.amountWei || "0"), BigInt(0))
-        .toString();
-      if (isSupabaseCampaign) setDisplayBalance(nextBalance);
     }
 
     if (proofResponse.ok) {
@@ -303,6 +299,14 @@ export default function CampaignSingle(props) {
     try {
       setError("");
       const amountWei = web3.utils.toWei(data.value, "ether");
+      if (BigInt(amountWei) <= BigInt(minimumContribution || "0")) {
+        throw new Error(
+          `Your donation must be greater than the minimum contribution of ${web3.utils.fromWei(
+            minimumContribution || "0",
+            "ether"
+          )} ETH.`
+        );
+      }
       const accounts = await web3.eth.getAccounts().catch(() => []);
       const donorAddress = accounts[0];
       if (!donorAddress) {

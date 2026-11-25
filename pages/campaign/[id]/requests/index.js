@@ -92,6 +92,13 @@ const RequestRow = ({
   const [loadingApprove, setLoadingApprove] = useState(false);
   const [errorMessageFinalize, setErrorMessageFinalize] = useState();
   const [loadingFinalize, setLoadingFinalize] = useState(false);
+  const finalizableRowBg = useColorModeValue("teal.100", "teal.700");
+  const defaultRowBg = useColorModeValue("gray.100", "gray.700");
+  const tooltipBg = useColorModeValue("white", "gray.700");
+  const tooltipColor = useColorModeValue("gray.800", "white");
+  const warningColor = useColorModeValue("red.600", "red.300");
+  const successColor = useColorModeValue("green.600", "green.300");
+  const infoColor = useColorModeValue("teal.800", "white");
   const onApprove = async () => {
     setLoadingApprove(true);
     try {
@@ -126,11 +133,7 @@ const RequestRow = ({
 
   return (
     <Tr
-      bg={
-        readyToFinalize && !request.complete
-          ? useColorModeValue("teal.100", "teal.700")
-          : useColorModeValue("gray.100", "gray.700")
-      }
+      bg={readyToFinalize && !request.complete ? finalizableRowBg : defaultRowBg}
       opacity={request.complete ? "0.4" : "1"}
     >
       <Td>{id} </Td>
@@ -156,27 +159,25 @@ const RequestRow = ({
         <HStack spacing={2}>
           <Tooltip
             label={errorMessageApprove}
-            bg={useColorModeValue("white", "gray.700")}
+            bg={tooltipBg}
             placement={"top"}
-            color={useColorModeValue("gray.800", "white")}
+            color={tooltipColor}
             fontSize={"1em"}
           >
             <WarningIcon
-              color={useColorModeValue("red.600", "red.300")}
+              color={warningColor}
               display={errorMessageApprove ? "inline-block" : "none"}
             />
           </Tooltip>
           {request.complete ? (
             <Tooltip
               label="This Request has been finalized & withdrawn to the recipient,it may then have less no of approvers"
-              bg={useColorModeValue("white", "gray.700")}
+              bg={tooltipBg}
               placement={"top"}
-              color={useColorModeValue("gray.800", "white")}
+              color={tooltipColor}
               fontSize={"1em"}
             >
-              <CheckCircleIcon
-                color={useColorModeValue("green.600", "green.300")}
-              />
+              <CheckCircleIcon color={successColor} />
             </Tooltip>
           ) : (
             <Button
@@ -198,13 +199,13 @@ const RequestRow = ({
       <Td>
         <Tooltip
           label={errorMessageFinalize}
-          bg={useColorModeValue("white", "gray.700")}
+          bg={tooltipBg}
           placement={"top"}
-          color={useColorModeValue("gray.800", "white")}
+          color={tooltipColor}
           fontSize={"1em"}
         >
           <WarningIcon
-            color={useColorModeValue("red.600", "red.300")}
+            color={warningColor}
             display={errorMessageFinalize ? "inline-block" : "none"}
             mr="2"
           />
@@ -212,14 +213,12 @@ const RequestRow = ({
         {request.complete ? (
           <Tooltip
               label="This Request has been finalized & withdrawn to the recipient,it may then have less no of approvers"
-            bg={useColorModeValue("white", "gray.700")}
+            bg={tooltipBg}
             placement={"top"}
-            color={useColorModeValue("gray.800", "white")}
+            color={tooltipColor}
             fontSize={"1em"}
           >
-            <CheckCircleIcon
-              color={useColorModeValue("green.600", "green.300")}
-            />
+            <CheckCircleIcon color={successColor} />
           </Tooltip>
         ) : (
           <HStack spacing={2}>
@@ -239,14 +238,14 @@ const RequestRow = ({
 
             <Tooltip
               label="This Request is ready to be Finalized because it has been approved by 50% Approvers"
-              bg={useColorModeValue("white", "gray.700")}
+              bg={tooltipBg}
               placement={"top"}
-              color={useColorModeValue("gray.800", "white")}
+              color={tooltipColor}
               fontSize={"1.2em"}
             >
               <InfoIcon
                 as="span"
-                color={useColorModeValue("teal.800", "white")}
+                color={infoColor}
                 display={
                   readyToFinalize && !request.complete ? "inline-block" : "none"
                 }
@@ -271,6 +270,11 @@ export default function Requests({
   const [requestsList, setRequestsList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [FundNotAvailable, setFundNotAvailable] = useState(false);
+  const muted = useColorModeValue("gray.500", "gray.200");
+  const headingColor = useColorModeValue("gray.800", "white");
+  const noRequestsMuted = useColorModeValue("gray.600", "gray.300");
+  const headingAlign = useBreakpointValue({ base: "left" });
+  const noRequestsAlign = useBreakpointValue({ base: "center" });
   const campaign = Campaign(campaignId);
   async function getRequests() {
     try {
@@ -340,7 +344,7 @@ export default function Requests({
                 as="span"
                 display={balance > 0 ? "inline" : "none"}
                 fontWeight={"normal"}
-                color={useColorModeValue("gray.500", "gray.200")}
+                color={muted}
               >
                 (${getWEIPriceInUSD(ETHPrice, balance)})
               </Text>
@@ -367,9 +371,9 @@ export default function Requests({
             <Flex flexDirection={{ base: "column", lg: "row" }} py={4}>
               <Box py="2" pr="2">
                 <Heading
-                  textAlign={useBreakpointValue({ base: "left" })}
+                  textAlign={headingAlign}
                   fontFamily={"heading"}
-                  color={useColorModeValue("gray.800", "white")}
+                  color={headingColor}
                   as="h3"
                   isTruncated
                   maxW={"3xl"}
@@ -458,7 +462,7 @@ export default function Requests({
               <SimpleGrid row spacing={2} align="center">
                 <Stack align="center">
                   <NextImage
-                    src="/static/no-requests.png"
+                    src="/no-requests.svg"
                     alt="no-request"
                     width="150"
                     height="150"
@@ -466,15 +470,15 @@ export default function Requests({
                 </Stack>
                 <Heading
                   textAlign={"center"}
-                  color={useColorModeValue("gray.800", "white")}
+                  color={headingColor}
                   as="h4"
                   size="md"
                 >
                   No Requests yet for {name} Campaign
                 </Heading>
                 <Text
-                  textAlign={useBreakpointValue({ base: "center" })}
-                  color={useColorModeValue("gray.600", "gray.300")}
+                  textAlign={noRequestsAlign}
+                  color={noRequestsMuted}
                   fontSize="sm"
                 >
                   Create a Withdrawal Request to Withdraw funds from the

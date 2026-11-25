@@ -96,33 +96,6 @@ export default function AIRecommendationPanel({ initialInterest = "", simpleQuic
     loadCampaigns();
   }, []);
 
-  if (simpleQuickLinksOnly) {
-    return (
-      <Box bg={panelBg} borderWidth="1px" rounded="xl" p={{ base: 5, md: 8 }} shadow="sm">
-        <Stack spacing={6}>
-          <Box>
-            <Heading size="lg" mb={2}>
-              Explore campaigns by cause
-            </Heading>
-            <Text color={muted} fontSize="md">
-              Choose a category to browse recommended campaigns on the dedicated recommendations page.
-            </Text>
-          </Box>
-
-          <HStack wrap="wrap" spacing={2}>
-            {quickQueries.map((query) => (
-              <NextLink key={query} href={`/recommendations?interest=${encodeURIComponent(query)}`} passHref>
-                <Button as="a" size="md" colorScheme="teal" variant="outline">
-                  {query}
-                </Button>
-              </NextLink>
-            ))}
-          </HStack>
-        </Stack>
-      </Box>
-    );
-  }
-
   useEffect(() => {
     if (!initialInterest) return;
     setInterest(initialInterest);
@@ -163,6 +136,33 @@ export default function AIRecommendationPanel({ initialInterest = "", simpleQuic
       setIsLoading(false);
     }
   };
+
+  if (simpleQuickLinksOnly) {
+    return (
+      <Box bg={panelBg} borderWidth="1px" rounded="xl" p={{ base: 5, md: 8 }} shadow="sm">
+        <Stack spacing={6}>
+          <Box>
+            <Heading size="lg" mb={2}>
+              Explore campaigns by cause
+            </Heading>
+            <Text color={muted} fontSize="md">
+              Choose a category to browse recommended campaigns on the dedicated recommendations page.
+            </Text>
+          </Box>
+
+          <HStack wrap="wrap" spacing={2}>
+            {quickQueries.map((query) => (
+              <NextLink key={query} href={`/recommendations?interest=${encodeURIComponent(query)}`} passHref>
+                <Button as="a" size="md" colorScheme="teal" variant="outline">
+                  {query}
+                </Button>
+              </NextLink>
+            ))}
+          </HStack>
+        </Stack>
+      </Box>
+    );
+  }
 
   return (
     <Box bg={panelBg} borderWidth="1px" rounded="xl" p={{ base: 5, md: 8 }} shadow="sm">
@@ -242,7 +242,7 @@ export default function AIRecommendationPanel({ initialInterest = "", simpleQuic
                   description={campaign.description}
                   creatorId={campaign.creatorAddress || campaign.creator_address}
                   imageURL={campaign.imageUrl || campaign.image_url}
-                  balance={campaign.balance || campaign.targetWei || "0"}
+                  balance={campaign.balance || "0"}
                   target={campaign.targetWei || campaign.target_wei || "0"}
                   ethPrice={0}
                   proofCount={campaign.proofCount || 0}

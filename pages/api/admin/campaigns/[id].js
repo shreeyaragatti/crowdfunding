@@ -1,5 +1,6 @@
 import supabaseAdmin from "../../../../lib/supabaseAdmin";
 import { requireAdmin } from "../../../../lib/authServer";
+import { serializeDonation } from "../../../../lib/campaignSerializers";
 
 async function signDocument(document) {
   const { data } = await supabaseAdmin.storage
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
     },
     creator,
     documents: signedDocuments,
-    donations: donations || [],
+    donations: (donations || []).map(serializeDonation),
     reviewEvents: events || [],
   });
 }
