@@ -175,9 +175,11 @@ function AdminDashboardContent() {
                       <Td>{formatWei(request.value)}</Td>
                       <Td>{request.recipient}</Td>
                       <Td>
-                        <Button as={NextLink} href={`/admin/campaigns/${request.campaignId}`} size="sm" colorScheme="teal" variant="outline">
-                          Review
-                        </Button>
+                        <NextLink href={`/admin/campaigns/${request.campaignId}`} passHref>
+                          <Button as="a" size="sm" colorScheme="teal" variant="outline">
+                            Review
+                          </Button>
+                        </NextLink>
                       </Td>
                     </Tr>
                   ))}

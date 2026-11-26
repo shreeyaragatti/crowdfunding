@@ -678,12 +678,12 @@ function CreatorCampaignDetailContent() {
 
                     {!withdrawals.legacy ? (
                       <HStack wrap="wrap">
-                        <Button as={NextLink} href={`/campaign/${campaign.contractAddress}/requests/new`} colorScheme="teal">
-                          Create withdrawal request
-                        </Button>
-                        <Button as={NextLink} href={`/campaign/${campaign.contractAddress}/requests`} variant="outline">
-                          Manage all requests
-                        </Button>
+                        <NextLink href={`/campaign/${campaign.contractAddress}/requests/new`} passHref>
+                          <Button as="a" colorScheme="teal">Create withdrawal request</Button>
+                        </NextLink>
+                        <NextLink href={`/campaign/${campaign.contractAddress}/requests`} passHref>
+                          <Button as="a" variant="outline">Manage all requests</Button>
+                        </NextLink>
                       </HStack>
                     ) : null}
                   </>

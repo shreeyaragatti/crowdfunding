@@ -377,8 +377,8 @@ export default function Requests({ campaignId, ETHPrice }) {
                 </Heading>
                 <Spacer />
                 {isManager ? (
-                  <NextLink href={`/campaign/${campaignId}/requests/new`}>
-                    <Button colorScheme="teal">Add Withdrawal Request</Button>
+                  <NextLink href={`/campaign/${campaignId}/requests/new`} passHref>
+                    <Button as="a" colorScheme="teal">Add Withdrawal Request</Button>
                   </NextLink>
                 ) : null}
               </Flex>
@@ -421,13 +421,9 @@ export default function Requests({ campaignId, ETHPrice }) {
                         : "Only the campaign creator can create withdrawal requests."}
                     </Text>
                     {isManager ? (
-                      <Button
-                        as={NextLink}
-                        href={`/campaign/${campaignId}/requests/new`}
-                        colorScheme="teal"
-                      >
-                        Create Withdrawal Request
-                      </Button>
+                      <NextLink href={`/campaign/${campaignId}/requests/new`} passHref>
+                        <Button as="a" colorScheme="teal">Create Withdrawal Request</Button>
+                      </NextLink>
                     ) : null}
                   </Stack>
                 </Box>
