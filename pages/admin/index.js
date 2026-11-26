@@ -24,6 +24,8 @@ const statusColor = {
 
 function AdminDashboardContent() {
   const [data, setData] = useState(null);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [withdrawalError, setWithdrawalError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const pageBg = useColorModeValue("gray.50", "gray.900");
@@ -33,20 +35,48 @@ function AdminDashboardContent() {
   useEffect(() => {
     let active = true;
     async function load() {
-      const response = await authFetch("/api/admin/overview");
-      const result = await response.json();
+      const [overviewResponse, withdrawalResponse] = await Promise.all([
+        authFetch("/api/admin/overview"),
+        authFetch("/api/admin/withdrawal-requests"),
+      ]);
+      const result = await overviewResponse.json();
+      const withdrawalResult = await withdrawalResponse.json();
       if (!active) return;
-      if (!response.ok) {
+
+      if (!overviewResponse.ok) {
         setError(result.error || "Could not load admin dashboard.");
         setLoading(false);
         return;
       }
+
+      if (!withdrawalResponse.ok) {
+        setWithdrawalError(
+          withdrawalResult.error || "Could not load withdrawal requests."
+        );
+      } else {
+        setWithdrawals(withdrawalResult.campaigns || []);
+      }
+
       setData(result);
       setLoading(false);
     }
     load();
     return () => { active = false; };
   }, []);
+
+  const pendingWithdrawals = withdrawals.flatMap((campaign) =>
+    (campaign.requests || [])
+      .filter(
+        (request) =>
+          !request.complete && !request.adminApproved && !request.adminRejected
+      )
+      .map((request) => ({
+        ...request,
+        campaignName: campaign.name,
+        campaignId: campaign.id,
+        contractAddress: campaign.contractAddress,
+      }))
+  );
 
   if (loading) {
     return (
@@ -74,6 +104,7 @@ function AdminDashboardContent() {
             <Stat bg={panelBg} p={4} rounded="lg" boxShadow="sm"><StatLabel>Needs info</StatLabel><StatNumber>{stats.needsInfo || 0}</StatNumber></Stat>
             <Stat bg={panelBg} p={4} rounded="lg" boxShadow="sm"><StatLabel>Approved</StatLabel><StatNumber>{stats.approved || 0}</StatNumber></Stat>
             <Stat bg={panelBg} p={4} rounded="lg" boxShadow="sm"><StatLabel>Published</StatLabel><StatNumber>{stats.published || 0}</StatNumber></Stat>
+            <Stat bg={panelBg} p={4} rounded="lg" boxShadow="sm"><StatLabel>Pending withdrawals</StatLabel><StatNumber>{pendingWithdrawals.length}</StatNumber></Stat>
             <Stat bg={panelBg} p={4} rounded="lg" boxShadow="sm"><StatLabel>Donations</StatLabel><StatNumber>{stats.totalDonations || 0}</StatNumber></Stat>
             <Stat bg={panelBg} p={4} rounded="lg" boxShadow="sm"><StatLabel>Raised (ETH)</StatLabel><StatNumber>{formatWei(stats.totalRaisedWei)}</StatNumber></Stat>
           </SimpleGrid>
@@ -116,6 +147,43 @@ function AdminDashboardContent() {
                 ))}
               </Tbody>
             </Table>
+          </Box>
+
+          <Box bg={panelBg} rounded="lg" boxShadow="md" overflowX="auto">
+            <Heading size="md" p={4}>Pending withdrawal approvals</Heading>
+            {withdrawalError ? (
+              <Text color="red.500" px={4} pb={3}>{withdrawalError}</Text>
+            ) : null}
+            {pendingWithdrawals.length === 0 ? (
+              <Text color={muted} px={4} pb={4}>No withdrawal requests are waiting for admin approval.</Text>
+            ) : (
+              <Table variant="simple">
+                <Thead>
+                  <Tr>
+                    <Th>Campaign</Th>
+                    <Th>Request</Th>
+                    <Th>Amount (ETH)</Th>
+                    <Th>Recipient</Th>
+                    <Th>Action</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {pendingWithdrawals.map((request) => (
+                    <Tr key={`${request.contractAddress}-${request.index}`}>
+                      <Td>{request.campaignName}</Td>
+                      <Td>{request.description}</Td>
+                      <Td>{formatWei(request.value)}</Td>
+                      <Td>{request.recipient}</Td>
+                      <Td>
+                        <Button as={NextLink} href={`/admin/campaigns/${request.campaignId}`} size="sm" colorScheme="teal" variant="outline">
+                          Review
+                        </Button>
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            )}
           </Box>
 
           <Box bg={panelBg} rounded="lg" boxShadow="md" overflowX="auto">

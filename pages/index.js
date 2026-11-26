@@ -30,6 +30,7 @@ import Campaign from "../smart-contract/campaign";
 import { ExternalLinkIcon } from "@chakra-ui/icons";
 import { FcShare, FcDonate, FcMoneyTransfer } from "react-icons/fc";
 import { isBlockchainConfigured } from "../lib/blockchainConfig";
+import { getPublishedCampaignAddresses } from "../lib/publishedCampaigns";
 import ProjectSetupStatus from "../components/ProjectSetupStatus";
 import AIRecommendationPanel from "../components/AIRecommendationPanel";
 import CampaignCard from "../components/CampaignCard";
@@ -40,7 +41,20 @@ export async function getServerSideProps(context) {
       throw new Error("Blockchain environment is not configured.");
     }
 
-    const campaigns = await factory.methods.getDeployedCampaigns().call();
+    const publishedAddresses = await getPublishedCampaignAddresses();
+    if (publishedAddresses === null) {
+      throw new Error("Supabase is not configured.");
+    }
+
+    const deployedCampaigns = await factory.methods
+      .getDeployedCampaigns()
+      .call();
+
+    // Only campaigns that completed the admin review and were recorded in
+    // Supabase are public. This hides local/dev/test factory deployments.
+    const campaigns = deployedCampaigns.filter((address) =>
+      publishedAddresses.has(String(address).toLowerCase())
+    );
 
     return {
       props: { campaigns, loadError: "" },
@@ -50,7 +64,7 @@ export async function getServerSideProps(context) {
       props: {
         campaigns: [],
         loadError:
-          "Blockchain settings are not complete yet. Add RPC and factory contract values to .env or .env.local after deployment.",
+          "Campaigns are published only after admin review. Check the Supabase and blockchain settings in .env.",
       },
     };
   }
