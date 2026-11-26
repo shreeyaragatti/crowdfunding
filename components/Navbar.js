@@ -98,8 +98,8 @@ export default function NavBar() {
         css={{
           backdropFilter: "saturate(180%) blur(5px)",
           backgroundColor: useColorModeValue(
-            "rgba(8, 69, 76, 0.8)",
-            "rgba(248, 252, 252, 0.8)"
+            "rgba(189, 183, 183, 0.8)",
+            "rgba(226, 231, 231, 0.96)"
           ),
         }}
       >
