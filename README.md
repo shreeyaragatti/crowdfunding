@@ -16,11 +16,11 @@ BetterFund lets anyone create and fund campaigns transparently on the Ethereum b
 
 - Create and manage crowdfunding campaigns with on-chain targets and minimum contributions.
 - Contribute to campaigns using Sepolia ETH via MetaMask.
-- Campaign managers can create withdrawal requests; contributors vote to approve them.
+- Campaign creators submit withdrawal requests; the platform admin approves or rejects each request before funds are released.
 - Upload proof images and documents to show how funds are being used.
 - AI-powered campaign recommendations based on donor interests.
 - AI assistant to help donors compare campaigns and decide where to donate.
-- Dev mode for testing without a wallet.
+- Admin review workflow so only approved, published campaigns appear publicly.
 
 ## Tech Stack
 
@@ -37,14 +37,22 @@ BetterFund lets anyone create and fund campaigns transparently on the Ethereum b
 
 Two Solidity contracts power the platform:
 
-- **CampaignFactory**: Deploys new `Campaign` instances and tracks all deployed campaigns.
-- **Campaign**: Handles contributions, withdrawal requests, contributor approvals, and fund finalization.
+- **CampaignFactory**: Deploys new `Campaign` instances and tracks all deployed campaigns. The factory stores the platform admin address and passes it to each new campaign.
+- **Campaign**: Handles contributions, withdrawal requests, admin approval, and fund finalization.
+
+Withdrawal flow:
+
+1. The campaign creator calls `createRequest(description, value, recipient)`.
+2. The platform admin calls `approveRequestAsAdmin(index)` or `rejectRequestAsAdmin(index)`.
+3. After approval, the campaign creator calls `finalizeRequest(index)` to release the funds to the recipient.
 
 Key contract events:
 - `CampaignCreated(address indexed campaign, address indexed creator, string name, uint256 target)`
 - `ContributionReceived(address indexed contributor, uint256 amount)`
 - `RequestCreated(uint256 indexed requestIndex, string description, uint256 value, address indexed recipient)`
 - `RequestApproved(uint256 indexed requestIndex, address indexed approver)`
+- `RequestAdminApproved(uint256 indexed requestIndex, address indexed admin)`
+- `RequestAdminRejected(uint256 indexed requestIndex, address indexed admin)`
 - `RequestFinalized(uint256 indexed requestIndex, address indexed recipient)`
 
 ## Prerequisites
@@ -87,6 +95,8 @@ npm install
    | `NEXT_PUBLIC_BLOCK_EXPLORER_URL` | Default: `https://sepolia.etherscan.io` |
    | `DEPLOYER_PRIVATE_KEY` | Deployer wallet private key (server-side only) |
    | `NEXT_PUBLIC_FACTORY_ADDRESS` | Deployed `CampaignFactory` address |
+   | `NEXT_PUBLIC_OWNER_ADDRESS` | Platform owner/admin wallet shown in the UI |
+   | `PLATFORM_ADMIN_ADDRESS` | Wallet allowed to approve withdrawal requests; defaults to `NEXT_PUBLIC_OWNER_ADDRESS` |
    | `NEXT_PUBLIC_BACKEND_PROVIDER` | Use `prisma` |
    | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
@@ -128,6 +138,7 @@ npm install
 | `npm run db:push` | Sync Prisma schema to Supabase |
 | `npm run db:migrate` | Create and apply Prisma migration |
 | `npm run db:studio` | Open Prisma Studio |
+| `npm run db:reset-campaigns` | Delete all campaign rows and storage files while preserving accounts |
 | `npm run contracts:compile` | Compile Solidity contracts with Hardhat |
 | `npm run contracts:test` | Run Hardhat tests |
 | `npm run contracts:deploy:sepolia` | Deploy CampaignFactory to Sepolia |
@@ -159,6 +170,21 @@ The Prisma schema defines four main models:
 1. Install MetaMask and create or import a wallet.
 2. Switch MetaMask to the Sepolia test network.
 3. Fund the wallet with Sepolia test ETH from a faucet.
+
+## Resetting Campaign Data
+
+To remove every campaign, including dev-mode, draft, rejected, and published campaigns, run:
+
+```bash
+node scripts/reset-campaign-data.js --dry-run
+npm run db:reset-campaigns
+```
+
+On PowerShell, run the dry-run directly with Node as shown above. You can also set `DRY_RUN=1` before `npm run db:reset-campaigns`.
+
+The script clears `campaign_metadata`, `withdrawal_request_metadata`, `chain_events`, `campaign_donations`, `campaign_proofs`, `campaign_supporting_documents`, `campaign_review_events`, and the campaign image/proof storage buckets. It does not delete Supabase auth users or `profiles`, so creator and admin accounts remain intact.
+
+On-chain campaign contracts cannot be deleted from the blockchain. The app only lists factory campaigns that have a `published` row in `campaign_metadata`, so old or orphaned on-chain campaigns disappear from the public site after the reset.
 
 ## Environment Notes
 

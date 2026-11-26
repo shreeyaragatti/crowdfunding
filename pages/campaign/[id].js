@@ -73,11 +73,11 @@ const isEthereumAddress = (value) => /^0x[a-fA-F0-9]{40}$/.test(value || "");
 async function getSupabaseCampaign(campaignId) {
   if (!supabaseAdmin) return null;
 
-  // First try to find by contract_address (for blockchain campaigns)
   const { data: byAddress, error: addressError } = await supabaseAdmin
     .from("campaign_metadata")
     .select("*")
     .eq("contract_address", campaignId)
+    .eq("status", "published")
     .maybeSingle();
 
   if (byAddress) return byAddress;
@@ -116,6 +116,12 @@ export async function getServerSideProps({ params }) {
   const campaignId = params.id;
   const ETHPrice = await getETHPrice().catch(() => 0);
   const supabaseCampaign = await getSupabaseCampaign(campaignId).catch(() => null);
+
+  // When Supabase is configured, only admin-approved/published campaigns are
+  // reachable. This keeps dev-mode and unapproved test campaigns out of the app.
+  if (supabaseAdmin && !supabaseCampaign) {
+    return { notFound: true };
+  }
 
   // Determine the effective campaign address for blockchain operations
   const effectiveAddress = supabaseCampaign?.contract_address || campaignId;
@@ -299,9 +305,9 @@ export default function CampaignSingle(props) {
     try {
       setError("");
       const amountWei = web3.utils.toWei(data.value, "ether");
-      if (BigInt(amountWei) <= BigInt(minimumContribution || "0")) {
+      if (BigInt(amountWei) < BigInt(minimumContribution || "0")) {
         throw new Error(
-          `Your donation must be greater than the minimum contribution of ${web3.utils.fromWei(
+          `Your donation must be at least the minimum contribution of ${web3.utils.fromWei(
             minimumContribution || "0",
             "ether"
           )} ETH.`
@@ -314,7 +320,7 @@ export default function CampaignSingle(props) {
       }
 
       const campaign = Campaign(effectiveAddress);
-      const receipt = await campaign.methods.contibute().send({
+      const receipt = await campaign.methods.contribute().send({
         from: donorAddress,
         value: amountWei,
       });
@@ -636,7 +642,9 @@ export default function CampaignSingle(props) {
                       Withdrawal requests
                     </Heading>
                     <Text color={muted} fontSize="sm">
-                      Blockchain campaigns can create and approve withdrawal requests.
+                      The campaign creator submits withdrawal requests. The
+                      platform admin approves each request before funds are
+                      released.
                     </Text>
                   </Box>
                   <NextLink href={`/campaign/${effectiveAddress}/requests`}>
