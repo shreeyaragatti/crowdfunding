@@ -1,522 +1,499 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Head from "next/head";
 import NextLink from "next/link";
-import NextImage from "next/image";
-import { useRouter } from "next/router";
-import { getETHPrice, getWEIPriceInUSD } from "../../../../lib/getETHPrice";
+import { useWallet } from "use-wallet";
 import {
-  Heading,
-  useBreakpointValue,
-  useColorModeValue,
-  Text,
-  Button,
-  Flex,
-  Container,
-  SimpleGrid,
+  Alert,
+  AlertDescription,
+  AlertIcon,
+  Badge,
   Box,
+  Button,
+  Container,
+  Flex,
+  Heading,
+  HStack,
+  Link,
   Spacer,
+  Spinner,
+  Stack,
   Table,
-  Thead,
+  TableCaption,
   Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
   Tooltip,
   Tr,
-  Th,
-  Td,
-  TableCaption,
-  Skeleton,
-  Alert,
-  AlertIcon,
-  AlertDescription,
-  HStack,
-  Stack,
-  Link,
+  useColorModeValue,
 } from "@chakra-ui/react";
 import {
   ArrowBackIcon,
-  InfoIcon,
   CheckCircleIcon,
+  InfoIcon,
   WarningIcon,
 } from "@chakra-ui/icons";
 import web3 from "../../../../smart-contract/web3";
 import Campaign from "../../../../smart-contract/campaign";
-import factory from "../../../../smart-contract/factory";
 import { getAddressExplorerUrl } from "../../../../lib/blockchainConfig";
+import { getETHPrice, getWEIPriceInUSD } from "../../../../lib/getETHPrice";
+import {
+  getCampaignWithdrawalData,
+  getRequestStatus,
+} from "../../../../lib/withdrawalRequests";
+import { getPublishedCampaignByAddress } from "../../../../lib/publishedCampaigns";
+import supabaseAdmin from "../../../../lib/supabaseAdmin";
+import { connectInjectedWallet } from "../../../../lib/wallet";
 
 export async function getServerSideProps({ params }) {
   const campaignId = params.id;
-  try {
-    const campaign = Campaign(campaignId);
-    const requestCount = await campaign.methods.getRequestsCount().call();
-    const approversCount = await campaign.methods.approversCount().call();
-    const summary = await campaign.methods.getSummary().call();
-    const ETHPrice = await getETHPrice();
+  const publishedCampaign = await getPublishedCampaignByAddress(
+    campaignId
+  ).catch(() => null);
 
-    return {
-      props: {
-        campaignId,
-        requestCount,
-        approversCount,
-        balance: summary[1],
-        name: summary[5],
-        ETHPrice,
-        loadError: "",
-      },
-    };
-  } catch (error) {
-    return {
-      props: {
-        campaignId,
-        requestCount: "0",
-        approversCount: "0",
-        balance: "0",
-        name: "Campaign unavailable",
-        ETHPrice: 0,
-        loadError:
-          "Withdrawal requests could not be loaded from the configured Ethereum network.",
-      },
-    };
+  if (supabaseAdmin && !publishedCampaign) {
+    return { notFound: true };
   }
+
+  const ETHPrice = await getETHPrice().catch(() => 0);
+
+  return {
+    props: {
+      campaignId,
+      ETHPrice,
+    },
+  };
 }
 
-const RequestRow = ({
-  id,
-  request,
-  approversCount,
-  campaignId,
-  disabled,
-  ETHPrice,
-}) => {
-  const router = useRouter();
-  const readyToFinalize = request.approvalCount > approversCount / 2;
-  const [errorMessageApprove, setErrorMessageApprove] = useState();
-  const [loadingApprove, setLoadingApprove] = useState(false);
-  const [errorMessageFinalize, setErrorMessageFinalize] = useState();
-  const [loadingFinalize, setLoadingFinalize] = useState(false);
-  const finalizableRowBg = useColorModeValue("teal.100", "teal.700");
-  const defaultRowBg = useColorModeValue("gray.100", "gray.700");
-  const tooltipBg = useColorModeValue("white", "gray.700");
-  const tooltipColor = useColorModeValue("gray.800", "white");
-  const warningColor = useColorModeValue("red.600", "red.300");
-  const successColor = useColorModeValue("green.600", "green.300");
-  const infoColor = useColorModeValue("teal.800", "white");
-  const onApprove = async () => {
-    setLoadingApprove(true);
-    try {
-      const campaign = Campaign(campaignId);
-      const accounts = await web3.eth.getAccounts();
-      await campaign.methods.approveRequest(id).send({
-        from: accounts[0],
-      });
-      router.reload();
-    } catch (err) {
-      setErrorMessageApprove(err.message);
-    } finally {
-      setLoadingApprove(false);
-    }
-  };
-
-  const onFinalize = async () => {
-    setLoadingFinalize(true);
-    try {
-      const campaign = Campaign(campaignId);
-      const accounts = await web3.eth.getAccounts();
-      await campaign.methods.finalizeRequest(id).send({
-        from: accounts[0],
-      });
-      router.reload();
-    } catch (err) {
-      setErrorMessageFinalize(err.message);
-    } finally {
-      setLoadingFinalize(false);
-    }
-  };
-
-  return (
-    <Tr
-      bg={readyToFinalize && !request.complete ? finalizableRowBg : defaultRowBg}
-      opacity={request.complete ? "0.4" : "1"}
-    >
-      <Td>{id} </Td>
-      <Td>{request.description}</Td>
-      <Td isNumeric>
-        {web3.utils.fromWei(request.value, "ether")}ETH ($
-        {getWEIPriceInUSD(ETHPrice, request.value)})
-      </Td>
-      <Td>
-        <Link
-          color="teal.500"
-          href={getAddressExplorerUrl(request.recipient)}
-          isExternal
-        >
-          {" "}
-          {request.recipient.substr(0, 10) + "..."}
-        </Link>
-      </Td>
-      <Td>
-        {request.approvalCount}/{approversCount}
-      </Td>
-      <Td>
-        <HStack spacing={2}>
-          <Tooltip
-            label={errorMessageApprove}
-            bg={tooltipBg}
-            placement={"top"}
-            color={tooltipColor}
-            fontSize={"1em"}
-          >
-            <WarningIcon
-              color={warningColor}
-              display={errorMessageApprove ? "inline-block" : "none"}
-            />
-          </Tooltip>
-          {request.complete ? (
-            <Tooltip
-              label="This Request has been finalized & withdrawn to the recipient,it may then have less no of approvers"
-              bg={tooltipBg}
-              placement={"top"}
-              color={tooltipColor}
-              fontSize={"1em"}
-            >
-              <CheckCircleIcon color={successColor} />
-            </Tooltip>
-          ) : (
-            <Button
-              colorScheme="yellow"
-              variant="outline"
-              _hover={{
-                bg: "yellow.600",
-                color: "white",
-              }}
-              onClick={onApprove}
-              isDisabled={disabled || request.approvalCount == approversCount}
-              isLoading={loadingApprove}
-            >
-              Approve
-            </Button>
-          )}
-        </HStack>
-      </Td>
-      <Td>
-        <Tooltip
-          label={errorMessageFinalize}
-          bg={tooltipBg}
-          placement={"top"}
-          color={tooltipColor}
-          fontSize={"1em"}
-        >
-          <WarningIcon
-            color={warningColor}
-            display={errorMessageFinalize ? "inline-block" : "none"}
-            mr="2"
-          />
-        </Tooltip>
-        {request.complete ? (
-          <Tooltip
-              label="This Request has been finalized & withdrawn to the recipient,it may then have less no of approvers"
-            bg={tooltipBg}
-            placement={"top"}
-            color={tooltipColor}
-            fontSize={"1em"}
-          >
-            <CheckCircleIcon color={successColor} />
-          </Tooltip>
-        ) : (
-          <HStack spacing={2}>
-            <Button
-              colorScheme="green"
-              variant="outline"
-              _hover={{
-                bg: "green.600",
-                color: "white",
-              }}
-              isDisabled={disabled || (!request.complete && !readyToFinalize)}
-              onClick={onFinalize}
-              isLoading={loadingFinalize}
-            >
-              Finalize
-            </Button>
-
-            <Tooltip
-              label="This Request is ready to be Finalized because it has been approved by 50% Approvers"
-              bg={tooltipBg}
-              placement={"top"}
-              color={tooltipColor}
-              fontSize={"1.2em"}
-            >
-              <InfoIcon
-                as="span"
-                color={infoColor}
-                display={
-                  readyToFinalize && !request.complete ? "inline-block" : "none"
-                }
-              />
-            </Tooltip>
-          </HStack>
-        )}
-      </Td>
-    </Tr>
-  );
+const statusColor = {
+  completed: "green",
+  approved: "teal",
+  pending: "yellow",
+  rejected: "red",
 };
 
-export default function Requests({
-  campaignId,
-  requestCount,
-  approversCount,
-  balance,
-  name,
-  ETHPrice,
-  loadError,
-}) {
-  const [requestsList, setRequestsList] = useState([]);
+const statusLabel = {
+  completed: "Completed",
+  approved: "Approved by admin",
+  pending: "Pending admin approval",
+  rejected: "Rejected by admin",
+};
+
+export default function Requests({ campaignId, ETHPrice }) {
+  const wallet = useWallet();
+  const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [FundNotAvailable, setFundNotAvailable] = useState(false);
+  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionLoading, setActionLoading] = useState("");
+  const [connecting, setConnecting] = useState(false);
   const muted = useColorModeValue("gray.500", "gray.200");
   const headingColor = useColorModeValue("gray.800", "white");
   const noRequestsMuted = useColorModeValue("gray.600", "gray.300");
-  const headingAlign = useBreakpointValue({ base: "left" });
-  const noRequestsAlign = useBreakpointValue({ base: "center" });
-  const campaign = Campaign(campaignId);
-  async function getRequests() {
-    try {
-      const requests = await Promise.all(
-        Array(parseInt(requestCount))
-          .fill()
-          .map((element, index) => {
-            return campaign.methods.requests(index).call();
-          })
-      );
+  const panelBg = useColorModeValue("white", "gray.800");
+  const successColor = useColorModeValue("green.600", "green.300");
+  const warningColor = useColorModeValue("red.600", "red.300");
 
-      console.log("requests", requests);
-      setRequestsList(requests);
-      setIsLoading(false);
-      return requests;
-    } catch (e) {
-      console.log(e);
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const result = await getCampaignWithdrawalData(campaignId);
+      setData(result);
+    } catch (loadError) {
+      setError(
+        loadError.message ||
+          "Withdrawal requests could not be loaded from the configured Ethereum network."
+      );
+    } finally {
       setIsLoading(false);
     }
-  }
+  }, [campaignId]);
 
   useEffect(() => {
-    if (balance == 0) {
-      setFundNotAvailable(true);
+    if (campaignId) load();
+  }, [campaignId, load]);
+
+  const isConnected = wallet.status === "connected" && Boolean(wallet.account);
+  const isManager =
+    isConnected &&
+    data?.manager &&
+    wallet.account.toLowerCase() === data.manager.toLowerCase();
+  const isPlatformAdmin =
+    isConnected &&
+    data?.platformAdmin &&
+    wallet.account.toLowerCase() === data.platformAdmin.toLowerCase();
+
+  const handleConnect = async () => {
+    setConnecting(true);
+    setActionError("");
+    try {
+      await connectInjectedWallet(wallet);
+    } catch (connectError) {
+      setActionError(connectError.message);
+    } finally {
+      setConnecting(false);
     }
-    getRequests();
-  }, []);
+  };
+
+  const sendTransaction = async (index, action) => {
+    if (!isConnected) {
+      setActionError("Connect your wallet first.");
+      return;
+    }
+
+    setActionLoading(`${index}:${action}`);
+    setActionError("");
+    try {
+      const campaign = Campaign(campaignId);
+      let method;
+
+      if (action === "approve") {
+        method = campaign.methods.approveRequestAsAdmin(index);
+      } else if (action === "reject") {
+        method = campaign.methods.rejectRequestAsAdmin(index);
+      } else if (action === "finalize") {
+        method = campaign.methods.finalizeRequest(index);
+      } else if (action === "legacyApprove") {
+        method = campaign.methods.approveRequest(index);
+      } else {
+        throw new Error("Unsupported withdrawal action.");
+      }
+
+      await method.send({ from: wallet.account });
+      await load();
+    } catch (transactionError) {
+      setActionError(transactionError.message || "Transaction failed.");
+    } finally {
+      setActionLoading("");
+    }
+  };
+
+  const renderActions = (request) => {
+    if (request.complete) {
+      return (
+        <HStack color={successColor} spacing={1}>
+          <CheckCircleIcon />
+          <Text fontSize="sm">Funds released</Text>
+        </HStack>
+      );
+    }
+
+    if (data?.legacy) {
+      const readyToFinalize =
+        request.approvalCount > (data.approversCount || 0) / 2;
+
+      return (
+        <HStack spacing={2}>
+          <Button
+            size="sm"
+            colorScheme="yellow"
+            variant="outline"
+            onClick={() => sendTransaction(request.index, "legacyApprove")}
+            isLoading={actionLoading === `${request.index}:legacyApprove`}
+            isDisabled={
+              !isConnected || request.approvalCount >= data.approversCount
+            }
+          >
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            colorScheme="green"
+            variant="outline"
+            onClick={() => sendTransaction(request.index, "finalize")}
+            isLoading={actionLoading === `${request.index}:finalize`}
+            isDisabled={!isManager || !readyToFinalize}
+          >
+            Finalize
+          </Button>
+        </HStack>
+      );
+    }
+
+    if (request.adminRejected) {
+      return (
+        <HStack color={warningColor} spacing={1}>
+          <WarningIcon />
+          <Text fontSize="sm">Rejected by admin</Text>
+        </HStack>
+      );
+    }
+
+    if (isPlatformAdmin) {
+      return (
+        <HStack spacing={2}>
+          <Button
+            size="sm"
+            colorScheme="green"
+            onClick={() => sendTransaction(request.index, "approve")}
+            isLoading={actionLoading === `${request.index}:approve`}
+            isDisabled={request.adminApproved}
+          >
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            colorScheme="red"
+            variant="outline"
+            onClick={() => sendTransaction(request.index, "reject")}
+            isLoading={actionLoading === `${request.index}:reject`}
+            isDisabled={request.adminApproved}
+          >
+            Reject
+          </Button>
+        </HStack>
+      );
+    }
+
+    if (isManager && request.adminApproved) {
+      return (
+        <Button
+          size="sm"
+          colorScheme="green"
+          onClick={() => sendTransaction(request.index, "finalize")}
+          isLoading={actionLoading === `${request.index}:finalize`}
+        >
+          Withdraw funds
+        </Button>
+      );
+    }
+
+    return (
+      <Text fontSize="sm" color={muted}>
+        {request.adminApproved
+          ? "Approved. The campaign creator can withdraw."
+          : "Waiting for platform admin approval."}
+      </Text>
+    );
+  };
 
   return (
-    <div>
+    <Box minH="100vh">
       <Head>
         <title>Campaign Withdrawal Requests</title>
-        <meta name="description" content="Create a Withdrawal Request" />
+        <meta name="description" content="Create and approve withdrawal requests" />
         <link rel="icon" href="/logo.svg" />
       </Head>
 
       <main>
-        <Container px={{ base: "4", md: "12" }} maxW={"7xl"} align={"left"}>
-          <Flex flexDirection={{ base: "column", md: "row" }} py={4}>
-            <Box py="4">
-              <Text fontSize={"lg"} color={"teal.400"}>
-                <ArrowBackIcon mr={2} />
-                <NextLink href={`/campaign/${campaignId}`}>
-                  Back to Campaign
-                </NextLink>
-              </Text>
-            </Box>
+        <Container px={{ base: "4", md: "12" }} maxW="7xl" py={8}>
+          <Flex flexDirection={{ base: "column", md: "row" }} align="center">
+            <Text fontSize="lg" color="teal.400">
+              <ArrowBackIcon mr={2} />
+              <NextLink href={`/campaign/${campaignId}`}>
+                Back to Campaign
+              </NextLink>
+            </Text>
             <Spacer />
-            <Box py="4">
-              Campaign Balance :{" "}
-              <Text as="span" fontWeight={"bold"} fontSize="lg">
-                {balance > 0
-                  ? web3.utils.fromWei(balance, "ether")
-                  : "0, Become a Donor"}
+            <Box textAlign={{ base: "left", md: "right" }}>
+              <Text as="span" color={muted}>
+                Campaign balance:{" "}
               </Text>
-              <Text
-                as="span"
-                display={balance > 0 ? "inline" : "none"}
-                pr={2}
-                fontWeight={"bold"}
-                fontSize="lg"
-              >
-                {" "}
-                ETH
+              <Text as="span" fontWeight="bold" fontSize="lg">
+                {data
+                  ? `${web3.utils.fromWei(data.balance || "0", "ether")} ETH`
+                  : "-"}
               </Text>
-              <Text
-                as="span"
-                display={balance > 0 ? "inline" : "none"}
-                fontWeight={"normal"}
-                color={muted}
-              >
-                (${getWEIPriceInUSD(ETHPrice, balance)})
-              </Text>
+              {data ? (
+                <Text fontSize="sm" color={muted}>
+                  ~${getWEIPriceInUSD(ETHPrice, data.balance || "0")}
+                </Text>
+              ) : null}
             </Box>
           </Flex>
-          {FundNotAvailable ? (
-            <Alert status="error" my={4}>
+
+          {!isConnected ? (
+            <Alert status="info" my={4} rounded="md">
+              <AlertIcon />
+              <AlertDescription flex="1">
+                Connect the wallet that will approve or withdraw funds.
+              </AlertDescription>
+              <Button
+                size="sm"
+                colorScheme="teal"
+                onClick={handleConnect}
+                isLoading={connecting}
+              >
+                Connect wallet
+              </Button>
+            </Alert>
+          ) : null}
+
+          {isConnected && data?.platformAdmin && !isPlatformAdmin && !isManager ? (
+            <Alert status="warning" my={4} rounded="md">
               <AlertIcon />
               <AlertDescription>
-                The Current Balance of the Campaign is 0, Please Contribute to
-                approve and finalize Requests.
+                This wallet cannot act on these requests. The platform admin
+                wallet is {data.platformAdmin}.
               </AlertDescription>
             </Alert>
           ) : null}
-          {loadError ? (
-            <Alert status="warning" my={4} rounded="md">
+
+          {isConnected && isPlatformAdmin ? (
+            <Alert status="success" my={4} rounded="md">
               <AlertIcon />
-              <AlertDescription>{loadError}</AlertDescription>
+              <AlertDescription>
+                You are connected as the platform admin. Approve or reject
+                withdrawal requests below.
+              </AlertDescription>
             </Alert>
           ) : null}
+
+          {error ? (
+            <Alert status="warning" my={4} rounded="md">
+              <AlertIcon />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {actionError ? (
+            <Alert status="error" my={4} rounded="md">
+              <AlertIcon />
+              <AlertDescription>{actionError}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {isLoading ? (
+            <Flex justify="center" py={16}>
+              <Spinner size="xl" />
+            </Flex>
+          ) : data ? (
+            <>
+              <Flex
+                flexDirection={{ base: "column", lg: "row" }}
+                py={4}
+                gap={3}
+                align={{ base: "stretch", lg: "center" }}
+              >
+                <Heading
+                  fontFamily="heading"
+                  color={headingColor}
+                  as="h1"
+                  size="lg"
+                >
+                  Withdrawal Requests for {data.name}
+                </Heading>
+                <Spacer />
+                {isManager ? (
+                  <NextLink href={`/campaign/${campaignId}/requests/new`} passHref>
+                    <Button as="a" colorScheme="teal">Add Withdrawal Request</Button>
+                  </NextLink>
+                ) : null}
+              </Flex>
+
+              {data.legacy ? (
+                <Alert status="info" my={4} rounded="md">
+                  <AlertIcon />
+                  <AlertDescription>
+                    This campaign uses the original supporter-approval flow.
+                    New campaigns use platform-admin approval.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Alert status="info" my={4} rounded="md">
+                  <AlertIcon />
+                  <AlertDescription>
+                    Workflow: the campaign creator submits a request, the
+                    platform admin approves it, then the creator withdraws the
+                    funds.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {data.requests.length === 0 ? (
+                <Box
+                  bg={panelBg}
+                  borderWidth="1px"
+                  rounded="lg"
+                  p={10}
+                  textAlign="center"
+                >
+                  <Stack align="center" spacing={4}>
+                    <InfoIcon boxSize={8} color="teal.400" />
+                    <Heading as="h2" size="md" color={headingColor}>
+                      No withdrawal requests yet
+                    </Heading>
+                    <Text color={noRequestsMuted} maxW="xl">
+                      {isManager
+                        ? "Create a withdrawal request for the amount you need. The platform admin must approve it before you can withdraw."
+                        : "Only the campaign creator can create withdrawal requests."}
+                    </Text>
+                    {isManager ? (
+                      <NextLink href={`/campaign/${campaignId}/requests/new`} passHref>
+                        <Button as="a" colorScheme="teal">Create Withdrawal Request</Button>
+                      </NextLink>
+                    ) : null}
+                  </Stack>
+                </Box>
+              ) : (
+                <Box overflowX="auto" bg={panelBg} rounded="lg" p={2}>
+                  <Table>
+                    <Thead>
+                      <Tr>
+                        <Th>ID</Th>
+                        <Th w="28%">Description</Th>
+                        <Th isNumeric>Amount</Th>
+                        <Th>Recipient</Th>
+                        <Th>Supporter approvals</Th>
+                        <Th>Admin status</Th>
+                        <Th>Action</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {data.requests.map((request) => {
+                        const status = getRequestStatus(request);
+                        return (
+                          <Tr key={request.index}>
+                            <Td>{request.index}</Td>
+                            <Td>{request.description}</Td>
+                            <Td isNumeric>
+                              {web3.utils.fromWei(request.value, "ether")} ETH
+                              <Text fontSize="xs" color={muted}>
+                                ${getWEIPriceInUSD(ETHPrice, request.value)}
+                              </Text>
+                            </Td>
+                            <Td>
+                              <Tooltip label={request.recipient}>
+                                <Link
+                                  color="teal.500"
+                                  href={getAddressExplorerUrl(request.recipient)}
+                                  isExternal
+                                >
+                                  {request.recipient
+                                    ? `${request.recipient.substr(0, 10)}...`
+                                    : "-"}
+                                </Link>
+                              </Tooltip>
+                            </Td>
+                            <Td>
+                              {request.approvalCount}
+                              {data.legacy
+                                ? `/${data.approversCount}`
+                                : ""}
+                            </Td>
+                            <Td>
+                              <Badge colorScheme={statusColor[status]}>
+                                {statusLabel[status]}
+                              </Badge>
+                            </Td>
+                            <Td>{renderActions(request)}</Td>
+                          </Tr>
+                        );
+                      })}
+                    </Tbody>
+                    <TableCaption textAlign="left" ml="-2">
+                      Found {data.requests.length} request
+                      {data.requests.length === 1 ? "" : "s"}
+                    </TableCaption>
+                  </Table>
+                </Box>
+              )}
+            </>
+          ) : null}
         </Container>
-        {!loadError && requestsList.length > 0 ? (
-          <Container px={{ base: "4", md: "12" }} maxW={"7xl"} align={"left"}>
-            <Flex flexDirection={{ base: "column", lg: "row" }} py={4}>
-              <Box py="2" pr="2">
-                <Heading
-                  textAlign={headingAlign}
-                  fontFamily={"heading"}
-                  color={headingColor}
-                  as="h3"
-                  isTruncated
-                  maxW={"3xl"}
-                >
-                  Withdrawal Requests for {name} Campaign
-                </Heading>
-              </Box>
-              <Spacer />
-              <Box py="2">
-                <NextLink href={`/campaign/${campaignId}/requests/new`}>
-                  <Button
-                    display={{ sm: "inline-flex" }}
-                    justify={"flex-end"}
-                    fontSize={"md"}
-                    fontWeight={600}
-                    color={"white"}
-                    bg={"teal.400"}
-                    href={"#"}
-                    _hover={{
-                      bg: "teal.300",
-                    }}
-                  >
-                    Add Withdrawal Request
-                  </Button>
-                </NextLink>
-              </Box>
-            </Flex>{" "}
-            <Box overflowX="auto">
-              <Table>
-                <Thead>
-                  <Tr>
-                    <Th>ID</Th>
-                    <Th w="30%">Description</Th>
-                    <Th isNumeric>Amount</Th>
-                    <Th maxW="12%" isTruncated>
-                      Recipient Wallet Address
-                    </Th>
-                    <Th>Approval Count </Th>
-                    <Th>Approve </Th>
-                    <Th>Finalize </Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {requestsList.map((request, index) => {
-                    return (
-                      <RequestRow
-                        key={index}
-                        id={index}
-                        request={request}
-                        approversCount={approversCount}
-                        campaignId={campaignId}
-                        disabled={FundNotAvailable}
-                        ETHPrice={ETHPrice}
-                      />
-                    );
-                  })}
-                </Tbody>
-                <TableCaption textAlign="left" ml="-2">
-                  Found {requestCount} Requests
-                </TableCaption>
-              </Table>
-            </Box>
-          </Container>
-        ) : !loadError ? (
-          <div>
-            <Container
-              px={{ base: "4", md: "12" }}
-              maxW={"7xl"}
-              align={"left"}
-              display={isLoading ? "block" : "none"}
-            >
-              <SimpleGrid rows={{ base: 3 }} spacing={2}>
-                <Skeleton height="2rem" />
-                <Skeleton height="5rem" />
-                <Skeleton height="5rem" />
-                <Skeleton height="5rem" />
-              </SimpleGrid>
-            </Container>
-            <Container
-              maxW={"lg"}
-              align={"center"}
-              display={
-                requestsList.length === 0 && !isLoading ? "block" : "none"
-              }
-            >
-              <SimpleGrid row spacing={2} align="center">
-                <Stack align="center">
-                  <NextImage
-                    src="/no-requests.svg"
-                    alt="no-request"
-                    width="150"
-                    height="150"
-                  />
-                </Stack>
-                <Heading
-                  textAlign={"center"}
-                  color={headingColor}
-                  as="h4"
-                  size="md"
-                >
-                  No Requests yet for {name} Campaign
-                </Heading>
-                <Text
-                  textAlign={noRequestsAlign}
-                  color={noRequestsMuted}
-                  fontSize="sm"
-                >
-                  Create a Withdrawal Request to Withdraw funds from the
-                  Campaign
-                </Text>
-
-                <Button
-                  fontSize={"md"}
-                  fontWeight={600}
-                  color={"white"}
-                  bg={"teal.400"}
-                  _hover={{
-                    bg: "teal.300",
-                  }}
-                >
-                  <NextLink href={`/campaign/${campaignId}/requests/new`}>
-                    <a>Create Withdrawal Request</a>
-                  </NextLink>
-                </Button>
-
-                <Button
-                  fontSize={"md"}
-                  fontWeight={600}
-                  color={"white"}
-                  bg={"gray.400"}
-                  _hover={{
-                    bg: "gray.300",
-                  }}
-                >
-                  <NextLink href={`/campaign/${campaignId}/`}>
-                    <a>Go to Campaign</a>
-                  </NextLink>
-                </Button>
-              </SimpleGrid>
-            </Container>
-          </div>
-        ) : null}
       </main>
-    </div>
+    </Box>
   );
 }

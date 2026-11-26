@@ -19,11 +19,23 @@ async function main() {
     );
   }
 
+  const platformAdmin =
+    process.env.PLATFORM_ADMIN_ADDRESS ||
+    process.env.NEXT_PUBLIC_OWNER_ADDRESS ||
+    deployer.address;
+
+  if (!ethers.utils.isAddress(platformAdmin)) {
+    throw new Error(
+      "PLATFORM_ADMIN_ADDRESS / NEXT_PUBLIC_OWNER_ADDRESS must be a valid Ethereum address."
+    );
+  }
+
   console.log(`Deploying CampaignFactory`);
   console.log(`Deployer: ${deployer.address}`);
+  console.log(`Platform admin: ${platformAdmin}`);
 
   const CampaignFactory = await ethers.getContractFactory("CampaignFactory");
-  const factory = await CampaignFactory.deploy();
+  const factory = await CampaignFactory.deploy(platformAdmin);
   await factory.deployed();
 
   console.log(`CampaignFactory deployed: ${factory.address}`);

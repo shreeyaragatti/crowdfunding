@@ -32,7 +32,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
+import { useWallet } from "use-wallet";
 import { authFetch } from "../../../lib/authContext";
+import Campaign from "../../../smart-contract/campaign";
+import {
+  getCampaignWithdrawalData,
+  getRequestStatus,
+} from "../../../lib/withdrawalRequests";
+import { connectInjectedWallet } from "../../../lib/wallet";
 import RequireAuth from "../../../components/RequireAuth";
 
 function formatWei(wei) {
@@ -52,6 +59,20 @@ const statusColor = {
   published: "teal",
 };
 
+const requestStatusColor = {
+  completed: "green",
+  approved: "teal",
+  pending: "yellow",
+  rejected: "red",
+};
+
+const requestStatusLabel = {
+  completed: "Completed",
+  approved: "Approved",
+  pending: "Pending",
+  rejected: "Rejected",
+};
+
 function AdminCampaignDetailContent() {
   const router = useRouter();
   const id = router.query.id;
@@ -60,6 +81,12 @@ function AdminCampaignDetailContent() {
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
   const [actionLoading, setActionLoading] = useState("");
+  const [withdrawals, setWithdrawals] = useState(null);
+  const [withdrawalLoading, setWithdrawalLoading] = useState(false);
+  const [withdrawalError, setWithdrawalError] = useState("");
+  const [withdrawalAction, setWithdrawalAction] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const wallet = useWallet();
   const pageBg = useColorModeValue("gray.50", "gray.900");
   const panelBg = useColorModeValue("white", "gray.800");
   const muted = useColorModeValue("gray.600", "gray.300");
@@ -81,6 +108,74 @@ function AdminCampaignDetailContent() {
   useEffect(() => {
     load();
   }, [id]);
+
+  const loadWithdrawals = async (campaignAddress) => {
+    if (!campaignAddress) {
+      setWithdrawals(null);
+      return;
+    }
+    setWithdrawalLoading(true);
+    setWithdrawalError("");
+    try {
+      const result = await getCampaignWithdrawalData(campaignAddress);
+      setWithdrawals(result);
+    } catch (loadError) {
+      setWithdrawalError(
+        loadError.message ||
+          "Withdrawal requests could not be loaded from the blockchain."
+      );
+    } finally {
+      setWithdrawalLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (data?.campaign?.contractAddress) {
+      loadWithdrawals(data.campaign.contractAddress);
+    }
+  }, [data?.campaign?.contractAddress]);
+
+  const connectWallet = async () => {
+    setConnecting(true);
+    setWithdrawalError("");
+    try {
+      await connectInjectedWallet(wallet);
+    } catch (connectError) {
+      setWithdrawalError(connectError.message);
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleWithdrawal = async (index, action) => {
+    const campaignAddress = data?.campaign?.contractAddress;
+    if (!campaignAddress) return;
+    if (wallet.status !== "connected" || !wallet.account) {
+      setWithdrawalError("Connect the platform admin wallet first.");
+      return;
+    }
+
+    setWithdrawalAction(`${index}:${action}`);
+    setWithdrawalError("");
+    try {
+      const campaign = Campaign(campaignAddress);
+      const method =
+        action === "approve"
+          ? campaign.methods.approveRequestAsAdmin(index)
+          : action === "reject"
+          ? campaign.methods.rejectRequestAsAdmin(index)
+          : campaign.methods.finalizeRequest(index);
+
+      await method.send({ from: wallet.account });
+      await loadWithdrawals(campaignAddress);
+    } catch (transactionError) {
+      setWithdrawalError(
+        transactionError.message || "The withdrawal action failed."
+      );
+    } finally {
+      setWithdrawalAction("");
+    }
+  };
 
   const review = async (action) => {
     setActionLoading(action);
@@ -117,6 +212,15 @@ function AdminCampaignDetailContent() {
   }
 
   const { campaign, creator, documents, donations, reviewEvents } = data;
+  const isConnected = wallet.status === "connected" && Boolean(wallet.account);
+  const isPlatformAdmin =
+    isConnected &&
+    withdrawals?.platformAdmin &&
+    wallet.account.toLowerCase() === withdrawals.platformAdmin.toLowerCase();
+  const isManager =
+    isConnected &&
+    withdrawals?.manager &&
+    wallet.account.toLowerCase() === withdrawals.manager.toLowerCase();
 
   return (
     <Box minH="100vh" bg={pageBg}>
@@ -208,6 +312,116 @@ function AdminCampaignDetailContent() {
               {campaign.reviewNotes ? <Text><strong>Current notes:</strong> {campaign.reviewNotes}</Text> : null}
               {campaign.rejectionReason ? <Text color="red.500"><strong>Rejection reason:</strong> {campaign.rejectionReason}</Text> : null}
             </Stack>
+          </Box>
+
+          <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
+            <Heading size="md" mb={4}>Withdrawal requests</Heading>
+            {!campaign.contractAddress ? (
+              <Text color={muted}>
+                This campaign is not deployed on-chain yet, so it has no
+                withdrawal requests.
+              </Text>
+            ) : (
+              <Stack spacing={4}>
+                <Text color={muted} fontSize="sm">
+                  The campaign creator submits withdrawal requests. Approve or
+                  reject each request with the platform admin wallet before
+                  funds can be released.
+                </Text>
+
+                {withdrawalLoading ? (
+                  <HStack><Spinner size="sm" /><Text color={muted}>Loading on-chain requests…</Text></HStack>
+                ) : null}
+
+                {withdrawalError ? (
+                  <Alert status="error"><AlertIcon /><AlertDescription>{withdrawalError}</AlertDescription></Alert>
+                ) : null}
+
+                {withdrawals ? (
+                  <>
+                    <HStack wrap="wrap" spacing={6}>
+                      <Text><strong>Campaign balance:</strong> {formatWei(withdrawals.balance)} ETH</Text>
+                      <Text><strong>Creator wallet:</strong> {withdrawals.manager}</Text>
+                      <Text><strong>Platform admin wallet:</strong> {withdrawals.platformAdmin || "Not available (legacy campaign)"}</Text>
+                    </HStack>
+
+                    {withdrawals.legacy ? (
+                      <Alert status="info"><AlertIcon /><AlertDescription>This legacy campaign uses supporter approvals instead of platform admin approval.</AlertDescription></Alert>
+                    ) : !isConnected ? (
+                      <Alert status="warning">
+                        <AlertIcon />
+                        <AlertDescription flex="1">Connect the platform admin wallet to approve withdrawal requests.</AlertDescription>
+                        <Button size="sm" colorScheme="teal" onClick={connectWallet} isLoading={connecting}>Connect wallet</Button>
+                      </Alert>
+                    ) : !isPlatformAdmin ? (
+                      <Alert status="warning">
+                        <AlertIcon />
+                        <AlertDescription>
+                          The connected wallet is not the platform admin. Switch to {withdrawals.platformAdmin} to approve requests.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <Alert status="success"><AlertIcon /><AlertDescription>Connected as the platform admin.</AlertDescription></Alert>
+                    )}
+
+                    {withdrawals.requests.length === 0 ? (
+                      <Text color={muted}>No withdrawal requests have been created yet.</Text>
+                    ) : (
+                      <Box overflowX="auto">
+                        <Table variant="simple" size="sm">
+                          <Thead>
+                            <Tr>
+                              <Th>ID</Th>
+                              <Th>Description</Th>
+                              <Th isNumeric>Amount (ETH)</Th>
+                              <Th>Recipient</Th>
+                              <Th>Status</Th>
+                              <Th>Action</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {withdrawals.requests.map((request) => {
+                              const status = getRequestStatus(request);
+                              return (
+                                <Tr key={request.index}>
+                                  <Td>{request.index}</Td>
+                                  <Td>{request.description}</Td>
+                                  <Td isNumeric>{formatWei(request.value)}</Td>
+                                  <Td fontSize="xs">{request.recipient}</Td>
+                                  <Td>
+                                    <Badge colorScheme={requestStatusColor[status]}>{requestStatusLabel[status]}</Badge>
+                                  </Td>
+                                  <Td>
+                                    {request.complete ? (
+                                      <Text fontSize="sm" color="green.500">Funds released</Text>
+                                    ) : request.adminRejected ? (
+                                      <Text fontSize="sm" color="red.500">Rejected</Text>
+                                    ) : withdrawals.legacy ? (
+                                      <Text fontSize="sm" color={muted}>Legacy approval flow</Text>
+                                    ) : isPlatformAdmin && !request.adminApproved ? (
+                                      <HStack spacing={2}>
+                                        <Button size="xs" colorScheme="green" onClick={() => handleWithdrawal(request.index, "approve")} isLoading={withdrawalAction === `${request.index}:approve`} isDisabled={withdrawalAction !== ""}>Approve</Button>
+                                        <Button size="xs" colorScheme="red" variant="outline" onClick={() => handleWithdrawal(request.index, "reject")} isLoading={withdrawalAction === `${request.index}:reject`} isDisabled={withdrawalAction !== ""}>Reject</Button>
+                                      </HStack>
+                                    ) : request.adminApproved && isManager ? (
+                                      <Button size="xs" colorScheme="green" onClick={() => handleWithdrawal(request.index, "finalize")} isLoading={withdrawalAction === `${request.index}:finalize`} isDisabled={withdrawalAction !== ""}>Withdraw funds</Button>
+                                    ) : request.adminApproved ? (
+                                      <Text fontSize="sm" color="teal.500">Approved — awaiting creator withdrawal</Text>
+                                    ) : (
+                                      <Text fontSize="sm" color={muted}>Pending admin approval</Text>
+                                    )}
+                                  </Td>
+                                </Tr>
+                              );
+                            })}
+                          </Tbody>
+                        </Table>
+                      </Box>
+                    )}
+                  </>
+                ) : null}
+              </Stack>
+            )}
           </Box>
 
           <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
