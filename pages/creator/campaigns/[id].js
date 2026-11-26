@@ -492,7 +492,9 @@ function CreatorCampaignDetailContent() {
                 </VStack>
               ) : null}
               {campaign.status === "published" && campaign.contractAddress ? (
-                <Button as={NextLink} href={`/campaign/${campaign.contractAddress}`} colorScheme="teal" variant="outline">View public campaign</Button>
+                <NextLink href={`/campaign/${campaign.contractAddress}`} passHref>
+                  <Button as="a" colorScheme="teal" variant="outline">View public campaign</Button>
+                </NextLink>
               ) : null}
             </Stack>
           </Box>

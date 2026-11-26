@@ -64,7 +64,9 @@ function CreatorDashboardContent() {
         <VStack spacing={6} align="stretch">
           <HStack justify="space-between" wrap="wrap">
             <Heading as="h1" size="xl">Creator Dashboard</Heading>
-            <Button as={NextLink} href="/campaign/new" colorScheme="teal">Create campaign draft</Button>
+            <NextLink href="/campaign/new" passHref>
+              <Button as="a" colorScheme="teal">Create campaign draft</Button>
+            </NextLink>
           </HStack>
           {error ? <Text color="red.500">{error}</Text> : null}
           <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
@@ -111,9 +113,13 @@ function CreatorDashboardContent() {
                       <Td>{campaign.donorCount}</Td>
                       <Td>
                         <HStack spacing={2}>
-                          <Button as={NextLink} href={`/creator/campaigns/${campaign.id}`} size="sm" variant="outline">Manage</Button>
+                          <NextLink href={`/creator/campaigns/${campaign.id}`} passHref>
+                            <Button as="a" size="sm" variant="outline">Manage</Button>
+                          </NextLink>
                           {campaign.status === "published" && campaign.contractAddress ? (
-                            <Button as={NextLink} href={`/campaign/${campaign.contractAddress}`} size="sm" colorScheme="teal" variant="ghost">View</Button>
+                            <NextLink href={`/campaign/${campaign.contractAddress}`} passHref>
+                              <Button as="a" size="sm" colorScheme="teal" variant="ghost">View</Button>
+                            </NextLink>
                           ) : null}
                         </HStack>
                       </Td>

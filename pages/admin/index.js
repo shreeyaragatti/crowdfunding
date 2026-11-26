@@ -108,7 +108,9 @@ function AdminDashboardContent() {
                     <Td>{formatWei(campaign.donationTotalWei)} ETH</Td>
                     <Td>{campaign.donorCount}</Td>
                     <Td>
-                      <Button as={NextLink} href={`/admin/campaigns/${campaign.id}`} size="sm" colorScheme="teal" variant="outline">Review</Button>
+                      <NextLink href={`/admin/campaigns/${campaign.id}`} passHref>
+                        <Button as="a" size="sm" colorScheme="teal" variant="outline">Review</Button>
+                      </NextLink>
                     </Td>
                   </Tr>
                 ))}
