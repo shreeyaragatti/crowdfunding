@@ -31,6 +31,10 @@ export default async function handler(req, res) {
     res.status(404).json({ error: "Campaign not found." });
     return;
   }
+  if (campaign.status !== "pending_review") {
+    res.status(400).json({ error: "Only campaigns awaiting review can be reviewed." });
+    return;
+  }
 
   const cleanNotes = String(notes || "").trim();
   const now = new Date().toISOString();

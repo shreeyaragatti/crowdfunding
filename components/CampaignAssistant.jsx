@@ -31,6 +31,7 @@ export default function CampaignAssistant({ campaignAddress }) {
   const [lastQuery, setLastQuery] = useState("");
   const panelBg = useColorModeValue("white", "gray.800");
   const muted = useColorModeValue("gray.600", "gray.300");
+  const answerBg = useColorModeValue("gray.50", "gray.900");
 
   const askAssistant = async (prompt) => {
     const questionText = (prompt || question).trim();
@@ -125,7 +126,7 @@ export default function CampaignAssistant({ campaignAddress }) {
         ) : null}
 
         {answer ? (
-          <Box bg={useColorModeValue("gray.50", "gray.900")} rounded="lg" p={4}>
+          <Box bg={answerBg} rounded="lg" p={4}>
             <Text color={muted} fontSize="xs" mb={2} fontWeight="bold">
               Question: {lastQuery}
             </Text>
@@ -137,7 +138,7 @@ export default function CampaignAssistant({ campaignAddress }) {
             </Text>
           </Box>
         ) : (
-          <Box bg={useColorModeValue("gray.50", "gray.900")} rounded="lg" p={4}>
+          <Box bg={answerBg} rounded="lg" p={4}>
             <Text color={muted} fontSize="sm">
               Ask about this campaign to get a focused recommendation and context-aware guidance.
             </Text>

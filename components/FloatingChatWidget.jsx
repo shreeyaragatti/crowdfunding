@@ -32,6 +32,9 @@ export default function FloatingChatWidget() {
   const panelBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const textColor = useColorModeValue("gray.800", "gray.100");
+  const headerBg = useColorModeValue("gray.50", "gray.900");
+  const userBubbleBg = useColorModeValue("teal.50", "teal.900");
+  const assistantBubbleBg = useColorModeValue("gray.100", "gray.700");
 
   useEffect(() => {
     setMounted(true);
@@ -85,7 +88,7 @@ export default function FloatingChatWidget() {
           overflow="hidden"
           maxH="80vh"
         >
-          <Box p={4} bg={useColorModeValue("gray.50", "gray.900")}> 
+          <Box p={4} bg={headerBg}>
             <HStack justify="space-between">
               <VStack align="flex-start" spacing={0}>
                 <Text fontWeight="bold">BetterFund Assistant</Text>
@@ -109,7 +112,7 @@ export default function FloatingChatWidget() {
                 <Box
                   key={`${message.role}-${index}`}
                   alignSelf={message.role === "user" ? "flex-end" : "flex-start"}
-                  bg={message.role === "user" ? useColorModeValue("teal.50", "teal.900") : useColorModeValue("gray.100", "gray.700")}
+                  bg={message.role === "user" ? userBubbleBg : assistantBubbleBg}
                   color={textColor}
                   rounded="2xl"
                   p={3}
@@ -129,7 +132,7 @@ export default function FloatingChatWidget() {
             </VStack>
           </Box>
 
-          <Box p={4} bg={useColorModeValue("gray.50", "gray.900")}> 
+          <Box p={4} bg={headerBg}>
             {error ? (
               <Text color="red.500" fontSize="sm" mb={2}>
                 {error}

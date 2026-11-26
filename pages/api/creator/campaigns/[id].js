@@ -1,6 +1,6 @@
 import supabaseAdmin from "../../../../lib/supabaseAdmin";
 import { requireCreator, requireAdmin } from "../../../../lib/authServer";
-import { serializeCampaign } from "../../../../lib/campaignSerializers";
+import { serializeCampaign, serializeDonation } from "../../../../lib/campaignSerializers";
 
 async function getCampaign(id) {
   const { data, error } = await supabaseAdmin
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
     res.status(200).json({
       campaign: serializeCampaign(campaign),
       documents: documents || [],
-      donations: donations || [],
+      donations: (donations || []).map(serializeDonation),
       reviewEvents: events || [],
     });
     return;
@@ -99,8 +99,22 @@ export default async function handler(req, res) {
     if (body.name) updates.name = String(body.name).trim();
     if (body.description) updates.description = String(body.description).trim();
     if (body.imageUrl !== undefined) updates.image_url = body.imageUrl || null;
-    if (body.targetWei) updates.target_wei = String(body.targetWei);
-    if (body.minimumContributionWei) updates.minimum_contribution_wei = String(body.minimumContributionWei);
+    if (body.targetWei !== undefined) {
+      const targetValue = String(body.targetWei).trim();
+      if (!/^[1-9][0-9]*$/.test(targetValue)) {
+        res.status(400).json({ error: "Target must be a valid wei amount greater than zero." });
+        return;
+      }
+      updates.target_wei = targetValue;
+    }
+    if (body.minimumContributionWei !== undefined) {
+      const minimumValue = String(body.minimumContributionWei).trim();
+      if (!/^[0-9]+$/.test(minimumValue)) {
+        res.status(400).json({ error: "Minimum contribution must be a valid wei amount." });
+        return;
+      }
+      updates.minimum_contribution_wei = minimumValue;
+    }
     if (body.category) updates.category = body.category;
     if (body.beneficiaryType) updates.beneficiary_type = body.beneficiaryType;
     if (body.beneficiaryCount !== undefined) updates.beneficiary_count = Number(body.beneficiaryCount) || 1;

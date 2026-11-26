@@ -9,6 +9,8 @@ import {
   Box,
   Button,
   Container,
+  FormControl,
+  FormLabel,
   Heading,
   HStack,
   Image,
@@ -58,6 +60,9 @@ function AdminCampaignDetailContent() {
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
   const [actionLoading, setActionLoading] = useState("");
+  const pageBg = useColorModeValue("gray.50", "gray.900");
+  const panelBg = useColorModeValue("white", "gray.800");
+  const muted = useColorModeValue("gray.600", "gray.300");
 
   const load = async () => {
     if (!id) return;
@@ -114,7 +119,7 @@ function AdminCampaignDetailContent() {
   const { campaign, creator, documents, donations, reviewEvents } = data;
 
   return (
-    <Box minH="100vh" bg={useColorModeValue("gray.50", "gray.900")}>
+    <Box minH="100vh" bg={pageBg}>
       <Head><title>{campaign.name} | Admin Review</title></Head>
       <Container maxW="7xl" py={{ base: 8, md: 12 }} mt={{ base: "80px", md: "80px" }}>
         <VStack spacing={6} align="stretch">
@@ -128,7 +133,7 @@ function AdminCampaignDetailContent() {
           ) : null}
 
           <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-            <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+            <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
               <Heading size="md" mb={4}>Creator</Heading>
               <Stack spacing={2}>
                 <Text><strong>Name:</strong> {creator?.full_name || campaign.creatorName}</Text>
@@ -138,7 +143,7 @@ function AdminCampaignDetailContent() {
               </Stack>
             </Box>
 
-            <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+            <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
               <Heading size="md" mb={4}>Campaign details</Heading>
               <Stack spacing={2}>
                 <Text><strong>Description:</strong> {campaign.description}</Text>
@@ -155,16 +160,16 @@ function AdminCampaignDetailContent() {
             </Box>
           </SimpleGrid>
 
-          <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+          <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
             <Heading size="md" mb={4}>Supporting documents ({documents.length})</Heading>
             {documents.length === 0 ? (
-              <Text color={useColorModeValue("gray.600", "gray.300")}>No supporting documents uploaded.</Text>
+              <Text color={muted}>No supporting documents uploaded.</Text>
             ) : (
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                 {documents.map((document) => (
                   <Box key={document.id} borderWidth="1px" rounded="md" p={4}>
                     <Text fontWeight="semibold">{document.document_name}</Text>
-                    <Text fontSize="sm" color={useColorModeValue("gray.600", "gray.300")}>
+                    <Text fontSize="sm" color={muted}>
                       {document.document_type} · {document.mime_type} · {Math.round((document.file_size || 0) / 1024)} KB
                     </Text>
                     {document.signedUrl && document.document_type === "image" ? (
@@ -182,27 +187,33 @@ function AdminCampaignDetailContent() {
             )}
           </Box>
 
-          <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+          <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
             <Heading size="md" mb={4}>Admin review</Heading>
             <Stack spacing={4}>
-              <FormControl>
-                <FormLabel>Review notes / rejection reason</FormLabel>
-                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Explain what is missing, why it is approved, or why it is rejected." />
-              </FormControl>
-              <HStack wrap="wrap">
-                <Button colorScheme="green" onClick={() => review("approve")} isLoading={actionLoading === "approve"} isDisabled={actionLoading !== ""}>Approve</Button>
-                <Button colorScheme="yellow" onClick={() => review("request_info")} isLoading={actionLoading === "request_info"} isDisabled={actionLoading !== ""}>Request more info</Button>
-                <Button colorScheme="red" onClick={() => review("reject")} isLoading={actionLoading === "reject"} isDisabled={actionLoading !== ""}>Reject</Button>
-              </HStack>
+              {campaign.status === "pending_review" ? (
+                <>
+                  <FormControl>
+                    <FormLabel>Review notes / rejection reason</FormLabel>
+                    <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Explain what is missing, why it is approved, or why it is rejected." />
+                  </FormControl>
+                  <HStack wrap="wrap">
+                    <Button colorScheme="green" onClick={() => review("approve")} isLoading={actionLoading === "approve"} isDisabled={actionLoading !== ""}>Approve</Button>
+                    <Button colorScheme="yellow" onClick={() => review("request_info")} isLoading={actionLoading === "request_info"} isDisabled={actionLoading !== ""}>Request more info</Button>
+                    <Button colorScheme="red" onClick={() => review("reject")} isLoading={actionLoading === "reject"} isDisabled={actionLoading !== ""}>Reject</Button>
+                  </HStack>
+                </>
+              ) : (
+                <Text color={muted}>This campaign is not awaiting review (current status: {campaign.status}).</Text>
+              )}
               {campaign.reviewNotes ? <Text><strong>Current notes:</strong> {campaign.reviewNotes}</Text> : null}
               {campaign.rejectionReason ? <Text color="red.500"><strong>Rejection reason:</strong> {campaign.rejectionReason}</Text> : null}
             </Stack>
           </Box>
 
-          <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+          <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
             <Heading size="md" mb={4}>Donations ({donations.length})</Heading>
             {donations.length === 0 ? (
-              <Text color={useColorModeValue("gray.600", "gray.300")}>No donations recorded.</Text>
+              <Text color={muted}>No donations recorded.</Text>
             ) : (
               <Table variant="simple">
                 <Thead>
@@ -219,7 +230,7 @@ function AdminCampaignDetailContent() {
                       <Td>{donation.donorName || donation.donorAddress}</Td>
                       <Td>{formatWei(donation.amountWei)}</Td>
                       <Td>{donation.source}</Td>
-                      <Td>{new Date(donation.created_at).toLocaleString()}</Td>
+                      <Td>{new Date(donation.createdAt).toLocaleString()}</Td>
                     </Tr>
                   ))}
                 </Tbody>
@@ -227,17 +238,17 @@ function AdminCampaignDetailContent() {
             )}
           </Box>
 
-          <Box bg={useColorModeValue("white", "gray.800")} p={6} rounded="lg" boxShadow="md">
+          <Box bg={panelBg} p={6} rounded="lg" boxShadow="md">
             <Heading size="md" mb={4}>Review history</Heading>
             {reviewEvents.length === 0 ? (
-              <Text color={useColorModeValue("gray.600", "gray.300")}>No review activity yet.</Text>
+              <Text color={muted}>No review activity yet.</Text>
             ) : (
               <VStack spacing={2} align="stretch">
                 {reviewEvents.map((event) => (
                   <Box key={event.id} borderWidth="1px" rounded="md" p={3}>
                     <HStack justify="space-between">
                       <Text fontWeight="semibold">{event.action}</Text>
-                      <Text fontSize="sm" color={useColorModeValue("gray.600", "gray.300")}>{new Date(event.created_at).toLocaleString()}</Text>
+                      <Text fontSize="sm" color={muted}>{new Date(event.created_at).toLocaleString()}</Text>
                     </HStack>
                     {event.notes ? <Text fontSize="sm" mt={1}>{event.notes}</Text> : null}
                   </Box>

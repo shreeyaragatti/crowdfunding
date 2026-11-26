@@ -101,7 +101,7 @@ async function getAssistantContext(campaignAddress) {
   const campaignQuery = supabaseAdmin
     .from("campaign_metadata")
     .select("*")
-    .in("status", ["created", "deployed"])
+    .in("status", ["published"])
     .order("created_at", { ascending: false })
     .limit(8);
 
@@ -214,7 +214,7 @@ function buildPrompt(message, context) {
     "Proof Updates:",
     context.proofs.length > 0
       ? context.proofs
-          .map((p) => `"${p.title}" - ${p.description.substring(0, 80)}...`)
+          .map((p) => `"${p.title}" - ${(p.description || "").substring(0, 80)}...`)
           .join("\n")
       : "No proof updates yet.",
     "",

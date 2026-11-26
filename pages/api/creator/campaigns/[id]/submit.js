@@ -1,5 +1,6 @@
 import supabaseAdmin from "../../../../../lib/supabaseAdmin";
 import { requireCreator } from "../../../../../lib/authServer";
+import { serializeCampaign } from "../../../../../lib/campaignSerializers";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -69,5 +70,5 @@ export default async function handler(req, res) {
     notes: req.body?.notes || "Campaign submitted for admin verification.",
   });
 
-  res.status(200).json({ campaign: updated });
+  res.status(200).json({ campaign: serializeCampaign(updated) });
 }

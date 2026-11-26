@@ -1,8 +1,6 @@
 import supabaseAdmin from "../../../../lib/supabaseAdmin";
 import { requireCreator } from "../../../../lib/authServer";
 
-const ALLOWED_STATUSES = ["draft", "pending_review", "needs_info", "approved", "rejected", "published"];
-
 function serializeCampaign(row) {
   return {
     id: row.id,
@@ -49,12 +47,15 @@ async function getDonationStats(campaignAddresses) {
   if (!campaignAddresses.length) return stats;
   const { data } = await supabaseAdmin
     .from("campaign_donations")
-    .select("campaign_address, amount_wei")
+    .select("campaign_address, amount_wei, donor_address")
     .in("campaign_address", campaignAddresses);
   for (const row of data || []) {
-    const current = stats[row.campaign_address] || { totalWei: BigInt(0), donorCount: 0 };
+    const current = stats[row.campaign_address] || {
+      totalWei: BigInt(0),
+      donors: new Set(),
+    };
     current.totalWei += BigInt(row.amount_wei || "0");
-    current.donorCount += 1;
+    current.donors.add(String(row.donor_address || "").toLowerCase());
     stats[row.campaign_address] = current;
   }
   return stats;
@@ -89,7 +90,7 @@ export default async function handler(req, res) {
       campaign.documentCount = counts[campaign.id] || 0;
       const donation = donationStats[campaign.contractAddress];
       campaign.donationTotalWei = donation ? donation.totalWei.toString() : "0";
-      campaign.donorCount = donation ? donation.donorCount : 0;
+      campaign.donorCount = donation ? donation.donors.size : 0;
     }
 
     res.status(200).json({ campaigns });
@@ -115,6 +116,13 @@ export default async function handler(req, res) {
       return;
     }
 
+    const targetValue = String(targetWei).trim();
+    const minimumValue = String(minimumContributionWei).trim();
+    if (!/^[1-9][0-9]*$/.test(targetValue) || !/^[0-9]+$/.test(minimumValue)) {
+      res.status(400).json({ error: "Target and minimum contribution must be valid wei amounts." });
+      return;
+    }
+
     const { data: campaign, error } = await supabaseAdmin
       .from("campaign_metadata")
       .insert({
@@ -123,8 +131,8 @@ export default async function handler(req, res) {
         name: String(name).trim(),
         description: String(description).trim(),
         image_url: imageUrl || null,
-        target_wei: String(targetWei),
-        minimum_contribution_wei: String(minimumContributionWei),
+        target_wei: targetValue,
+        minimum_contribution_wei: minimumValue,
         status: "draft",
         category: category || "general",
         beneficiary_type: beneficiaryType || "general",

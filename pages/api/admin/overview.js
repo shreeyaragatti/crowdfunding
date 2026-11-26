@@ -71,14 +71,23 @@ export default async function handler(req, res) {
   }
   const donationStats = {};
   for (const donation of donations || []) {
-    const current = donationStats[donation.campaign_address] || { totalWei: BigInt(0), donorCount: 0 };
+    const current = donationStats[donation.campaign_address] || {
+      totalWei: BigInt(0),
+      donors: new Set(),
+    };
     current.totalWei += BigInt(donation.amount_wei || "0");
-    current.donorCount += 1;
+    current.donors.add(String(donation.donor_address || "").toLowerCase());
     donationStats[donation.campaign_address] = current;
   }
 
+  const getDonationSummary = (address) => {
+    const stats = address ? donationStats[address] : null;
+    if (!stats) return null;
+    return { totalWei: stats.totalWei, donorCount: stats.donors.size };
+  };
+
   const serializedCampaigns = (campaigns || []).map((campaign) => {
-    const stats = donationStats[campaign.contract_address] || null;
+    const stats = getDonationSummary(campaign.contract_address);
     return serializeCampaign(campaign, creatorMap.get(campaign.creator_id), documentCounts[campaign.id], stats);
   });
 

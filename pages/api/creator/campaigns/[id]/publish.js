@@ -1,5 +1,6 @@
 import supabaseAdmin from "../../../../../lib/supabaseAdmin";
 import { requireCreator } from "../../../../../lib/authServer";
+import { serializeCampaign } from "../../../../../lib/campaignSerializers";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -18,6 +19,14 @@ export default async function handler(req, res) {
   const { contractAddress, transactionHash } = req.body || {};
   if (!contractAddress || !transactionHash) {
     res.status(400).json({ error: "contractAddress and transactionHash are required." });
+    return;
+  }
+  if (!/^0x[a-fA-F0-9]{40}$/.test(String(contractAddress))) {
+    res.status(400).json({ error: "contractAddress must be a valid Ethereum address." });
+    return;
+  }
+  if (!/^0x[a-fA-F0-9]{64}$/.test(String(transactionHash))) {
+    res.status(400).json({ error: "transactionHash must be a valid Ethereum transaction hash." });
     return;
   }
 
@@ -64,5 +73,5 @@ export default async function handler(req, res) {
     notes: `Published on Sepolia: ${transactionHash}`,
   });
 
-  res.status(200).json({ campaign: updated });
+  res.status(200).json({ campaign: serializeCampaign(updated) });
 }
